@@ -2,6 +2,8 @@
 
 Three tiny mobile game prototypes. Each one is a single self-contained HTML file: open it in a phone browser and play.
 
+**Play on your phone:** https://mikialanam.github.io/game-prototypes/ (works once GitHub Pages is switched on, see the morning report).
+
 | Game | Type | File | Notes |
 |---|---|---|---|
 | Glow Grid | Daily puzzle, streak | [games/glow-grid/glow-grid.html](games/glow-grid/glow-grid.html) | [README](games/glow-grid/README.md) |
