@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b14">
+<title>Pulse · One-Tap Reflex</title>
+<style>
+  :root { --bg: #0b0b14; --panel: #191a2c; --text: #f2f2ff; --muted: #9b9cc0; --accent: #4de0ff; --gold: #ffcf4d; --danger: #ff5c7a; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; touch-action: none; user-select: none; -webkit-user-select: none; }
+  body { display: flex; flex-direction: column; height: 100dvh; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px 0; z-index: 2; }
+  h1 { font-size: 20px; margin: 0; }
+  .pill { background: var(--panel); border-radius: 999px; padding: 6px 12px; font-size: 14px; font-weight: 600; }
+  #stage { position: relative; flex: 1; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #hud { position: absolute; top: 8px; left: 0; right: 0; text-align: center; pointer-events: none; }
+  #score { font-size: 64px; font-weight: 800; line-height: 1; }
+  #feedback { font-size: 18px; font-weight: 800; height: 24px; color: var(--gold); letter-spacing: 1px; }
+  #goal { font-size: 13px; color: var(--muted); }
+  .ad { height: 60px; margin: 8px 16px calc(8px + env(safe-area-inset-bottom)); border: 2px dashed #464a78; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; text-align: center; }
+  .overlay { position: fixed; inset: 0; background: rgba(4,4,12,.86); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10; touch-action: manipulation; }
+  .overlay.show { display: flex; }
+  .card { background: var(--panel); border-radius: 18px; padding: 22px; width: 100%; max-width: 400px; text-align: center; }
+  .card h2 { margin: 0 0 6px; }
+  .sub { color: var(--muted); font-size: 14px; margin: 4px 0; }
+  .big { font-size: 56px; font-weight: 800; margin: 4px 0; }
+  .newbest { color: var(--gold); font-weight: 800; letter-spacing: 1px; }
+  .row { display: flex; gap: 10px; margin-top: 12px; }
+  button.btn { flex: 1; min-height: 54px; border: 0; border-radius: 14px; font-size: 17px; font-weight: 700; background: #2a2c48; color: var(--text); }
+  button.primary { background: var(--accent); color: #032530; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 15px; }
+  td { padding: 8px 6px; border-bottom: 1px solid #2c2e4c; text-align: left; }
+  td:last-child { text-align: right; font-weight: 700; }
+  tr.you td { color: var(--gold); }
+  .demo { background: var(--danger); color: #2b0610; font-weight: 800; font-size: 12px; border-radius: 6px; padding: 3px 8px; display: inline-block; }
+  .fine { font-size: 12px; color: var(--muted); margin: 8px 0 12px; }
+  .goalbox { background: #10111f; border-radius: 12px; padding: 10px; margin: 12px 0 4px; font-size: 14px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>◎ Pulse</h1>
+  <div class="pill" id="bestPill">Best 0</div>
+</header>
+<div id="stage">
+  <canvas id="cv"></canvas>
+  <div id="hud">
+    <div id="score">0</div>
+    <div id="feedback"></div>
+    <div id="goal"></div>
+  </div>
+</div>
+<div class="ad" aria-label="advertisement placeholder">AD PLACEHOLDER · 320×50 banner<br>No ad network connected</div>
+
+<div class="overlay show" id="startOv">
+  <div class="card">
+    <h2>◎ Pulse</h2>
+    <p class="sub">Tap <b>anywhere</b> when the shrinking ring lines up with the white target ring.</p>
+    <p class="sub">Dead centre = <b style="color:var(--gold)">PERFECT</b> (+2 and a combo). It speeds up every hit. Miss once and it's over.</p>
+    <div class="goalbox" id="startGoal"></div>
+    <div class="row"><button class="btn primary" id="playBtn">Tap to play</button></div>
+    <div class="row"><button class="btn" id="prizeBtnA">🏆 Prize pool</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="overOv">
+  <div class="card">
+    <h2 id="overTitle">Game over</h2>
+    <div class="big" id="overScore">0</div>
+    <div class="newbest" id="newBest"></div>
+    <p class="sub" id="overBest"></p>
+    <div class="goalbox" id="overGoal"></div>
+    <div class="row"><button class="btn primary" id="againBtn">Play again</button></div>
+    <div class="row"><button class="btn" id="prizeBtnB">🏆 Prize pool</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="prizeOv">
+  <div class="card">
+    <span class="demo">DEMO · NOT REAL MONEY</span>
+    <h2 style="margin-top:10px">Today's prize pool</h2>
+    <p class="sub">Highest score today (example)</p>
+    <table id="prizeTable"></table>
+    <p class="fine">Prototype only. No payments, no entry fees, no real prizes. Any real reward scheme must be reviewed by a lawyer first.</p>
+    <button class="btn primary" style="width:100%" id="closePrize">Close</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const STORE = 'pulse.v1';
+  const $ = id => document.getElementById(id);
+  function load() { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch (e) { return {}; } }
+  function save(s) { try { localStorage.setItem(STORE, JSON.stringify(s)); } catch (e) {} }
+  const pad = n => String(n).padStart(2, '0');
+  const keyOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const todayKey = () => keyOf(new Date());
+  const yesterdayKey = () => { const d = new Date(); d.setDate(d.getDate() - 1); return keyOf(d); };
+  function hash(str) { let h = 2166136261; for (const c of str) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+
+  // Daily goal: same target for everyone today (15..34)
+  const dailyGoal = 15 + (hash('pulse-' + todayKey()) % 20);
+  function goalStreak(s) { return (s.goalDay === todayKey() || s.goalDay === yesterdayKey()) ? (s.goalStreak || 0) : 0; }
+  function goalText() {
+    const s = load(); const done = s.goalDay === todayKey();
+    return `${done ? '✅' : '🎯'} Today's goal: score <b>${dailyGoal}</b> · 🔥 goal streak ${goalStreak(s)} day${goalStreak(s) === 1 ? '' : 's'}` +
+      `<br><span style="color:var(--muted)">Today's best: ${s.todayKey === todayKey() ? s.todayBest : 0}</span>`;
+  }
+
+  // ---------- canvas ----------
+  const cv = $('cv'), ctx = cv.getContext('2d');
+  let W = 0, H = 0, DPR = 1;
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 3);
+    const r = $('stage').getBoundingClientRect(); W = r.width; H = r.height;
+    cv.width = W * DPR; cv.height = H * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener('resize', resize); resize();
+
+  // ---------- game state ----------
+  let state = 'menu'; // menu | play | over
+  let score, combo, speed, ringR, targetR, win, hue, flash, shake, last, particles, fb, fbT;
+  const base = () => Math.min(W, H);
+
+  function reset() {
+    score = 0; combo = 0; hue = 190; flash = 0; shake = 0; particles = [];
+    targetR = base() * 0.18;
+    speed = base() * 0.32;        // px per second
+    win = base() * 0.045;         // hit window (radius tolerance)
+    ringR = base() * 0.48;
+    setFb('');
+    $('score').textContent = '0';
+  }
+  function setFb(t) { fb = t; fbT = 0.7; $('feedback').textContent = t; }
+
+  function newRing() { ringR = base() * (0.44 + Math.random() * 0.06); }
+
+  function start() {
+    reset(); state = 'play';
+    $('startOv').classList.remove('show'); $('overOv').classList.remove('show');
+    $('goal').innerHTML = `🎯 goal ${dailyGoal}`;
+    last = performance.now();
+  }
+
+  function hit() {
+    const d = Math.abs(ringR - targetR);
+    if (d <= win) {
+      const perfect = d <= win * 0.35;
+      combo = perfect ? combo + 1 : 0;
+      const pts = perfect ? 2 + Math.floor(combo / 3) : 1;
+      score += pts;
+      $('score').textContent = score;
+      setFb(perfect ? (combo >= 3 ? `PERFECT ×${combo}` : 'PERFECT') : 'GOOD');
+      flash = perfect ? 1 : 0.5;
+      burst(perfect);
+      speed *= 1.045;                                  // gets faster
+      win = Math.max(base() * 0.022, win * 0.985);     // and tighter
+      hue = (hue + 23) % 360;
+      try { navigator.vibrate && navigator.vibrate(perfect ? 20 : 10); } catch (e) {}
+      newRing();
+    } else {
+      gameOver();
+    }
+  }
+
+  function burst(perfect) {
+    const n = perfect ? 26 : 12;
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, v = 80 + Math.random() * 220;
+      particles.push({ x: W / 2 + Math.cos(a) * targetR, y: H / 2 + Math.sin(a) * targetR, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.6 });
+    }
+  }
+
+  function gameOver() {
+    state = 'over'; shake = 1;
+    try { navigator.vibrate && navigator.vibrate([40, 40, 60]); } catch (e) {}
+    const s = load();
+    const isBest = score > (s.best || 0);
+    if (isBest) s.best = score;
+    if (s.todayKey !== todayKey()) { s.todayKey = todayKey(); s.todayBest = 0; }
+    s.todayBest = Math.max(s.todayBest, score);
+    s.plays = (s.plays || 0) + 1;
+    if (score >= dailyGoal && s.goalDay !== todayKey()) {
+      s.goalStreak = s.goalDay === yesterdayKey() ? (s.goalStreak || 0) + 1 : 1;
+      s.goalDay = todayKey();
+    }
+    save(s);
+    setTimeout(() => {
+      $('overScore').textContent = score;
+      $('newBest').textContent = isBest && score > 0 ? '★ NEW BEST ★' : '';
+      $('overBest').textContent = `Best ever: ${s.best || 0}`;
+      $('overGoal').innerHTML = goalText();
+      $('overOv').classList.add('show');
+      updatePill();
+    }, 550);
+  }
+
+  function updatePill() { $('bestPill').textContent = 'Best ' + (load().best || 0); }
+
+  // ---------- loop ----------
+  function frame(now) {
+    const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now;
+    if (state === 'play') {
+      ringR -= speed * dt;
+      if (ringR < targetR - win) { ringR = targetR - win; gameOver(); }
+    }
+    if (fbT > 0) { fbT -= dt; if (fbT <= 0) $('feedback').textContent = ''; }
+    flash = Math.max(0, flash - dt * 3);
+    shake = Math.max(0, shake - dt * 2.5);
+    particles.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; });
+    particles = particles.filter(p => p.life > 0);
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  function draw() {
+    ctx.save();
+    ctx.clearRect(0, 0, W, H);
+    if (shake > 0) ctx.translate((Math.random() - .5) * 14 * shake, (Math.random() - .5) * 14 * shake);
+    const cx = W / 2, cy = H / 2 + 30;
+    // background glow
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, base() * 0.6);
+    g.addColorStop(0, `hsla(${hue},90%,55%,${0.12 + flash * 0.25})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    {
+      // hit zone band
+      ctx.strokeStyle = `hsla(${hue},90%,60%,.18)`; ctx.lineWidth = (win || base() * .045) * 2;
+      ctx.beginPath(); ctx.arc(cx, cy, targetR || base() * .18, 0, Math.PI * 2); ctx.stroke();
+      // target ring
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(cx, cy, targetR || base() * .18, 0, Math.PI * 2); ctx.stroke();
+      // pulse ring
+      if (state === 'play' || state === 'over') {
+        ctx.strokeStyle = state === 'over' ? '#ff5c7a' : `hsl(${hue},95%,62%)`;
+        ctx.lineWidth = 8; ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = 18;
+        ctx.beginPath(); ctx.arc(cx, cy, Math.max(4, ringR), 0, Math.PI * 2); ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+    }
+    particles.forEach(p => {
+      ctx.fillStyle = `hsla(${hue},95%,70%,${p.life / 0.6})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y + 30, 3, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.restore();
+  }
+
+  // ---------- input ----------
+  $('stage').addEventListener('pointerdown', e => { e.preventDefault(); if (state === 'play') hit(); });
+  window.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); state === 'play' ? hit() : (state !== 'play' && !$('prizeOv').classList.contains('show') && start()); } });
+  $('playBtn').addEventListener('click', start);
+  $('againBtn').addEventListener('click', start);
+
+  // ---------- prize pool (placeholder) ----------
+  function showPrize() {
+    const s = load(); const mine = s.todayKey === todayKey() ? s.todayBest : null;
+    const rows = [['Ava K.', 61], ['Jun P.', 48], ['Sam R.', 40], ['Leo T.', 33], ['Mia D.', 27]];
+    if (mine != null) rows.push(['You', mine]);
+    rows.sort((a, b) => b[1] - a[1]);
+    const prize = ['$10', '$5', '$1', '$1', '$1'];
+    $('prizeTable').innerHTML = rows.slice(0, 6).map((r, i) =>
+      `<tr class="${r[0] === 'You' ? 'you' : ''}"><td>${i + 1}. ${r[0]} · ${r[1]}</td><td>${prize[i] || '—'}</td></tr>`).join('') +
+      (mine == null ? '<tr><td colspan="2" style="color:var(--muted)">Play a round to see your spot</td></tr>' : '');
+    $('prizeOv').classList.add('show');
+  }
+  $('prizeBtnA').addEventListener('click', showPrize);
+  $('prizeBtnB').addEventListener('click', showPrize);
+  $('closePrize').addEventListener('click', () => $('prizeOv').classList.remove('show'));
+
+  // ---------- boot ----------
+  reset();
+  $('startGoal').innerHTML = goalText();
+  updatePill();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#101820">
+<title>Math Sprint 60</title>
+<style>
+  :root { --bg: #101820; --panel: #1b2833; --text: #f1f7fb; --muted: #93a7b5; --accent: #ff9f1c; --good: #3ddc84; --bad: #ff5d5d; --gold: #ffd54d; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  body { display: flex; flex-direction: column; min-height: 100dvh; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px 4px; }
+  h1 { font-size: 20px; margin: 0; }
+  .pill { background: var(--panel); border-radius: 999px; padding: 6px 12px; font-size: 14px; font-weight: 600; }
+  main { flex: 1; display: flex; flex-direction: column; padding: 8px 16px; gap: 12px; max-width: 480px; width: 100%; margin: 0 auto; }
+  .bar { height: 12px; background: var(--panel); border-radius: 99px; overflow: hidden; }
+  #timeFill { height: 100%; width: 100%; background: var(--accent); transition: width .1s linear; }
+  .top { display: flex; justify-content: space-between; font-weight: 700; font-size: 18px; }
+  #combo { color: var(--gold); }
+  #q { flex: 1; display: flex; align-items: center; justify-content: center; font-size: clamp(44px, 14vw, 72px); font-weight: 800;
+    background: var(--panel); border-radius: 18px; min-height: 150px; transition: background .15s; font-variant-numeric: tabular-nums; }
+  #q.good { background: #1e4a33; } #q.bad { background: #4f2228; }
+  #answers { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .ans { min-height: 84px; border: 0; border-radius: 16px; background: #26394a; color: var(--text); font-size: 32px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .ans:active { transform: scale(.96); }
+  .ad { height: 60px; margin: 8px 16px calc(8px + env(safe-area-inset-bottom)); border: 2px dashed #3f5566; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; text-align: center; }
+  .overlay { position: fixed; inset: 0; background: rgba(5,10,14,.88); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+  .overlay.show { display: flex; }
+  .card { background: var(--panel); border-radius: 18px; padding: 22px; width: 100%; max-width: 400px; text-align: center; }
+  .card h2 { margin: 0 0 6px; }
+  .sub { color: var(--muted); font-size: 14px; margin: 4px 0; }
+  .big { font-size: 56px; font-weight: 800; margin: 2px 0; }
+  .newbest { color: var(--gold); font-weight: 800; letter-spacing: 1px; min-height: 20px; }
+  .row { display: flex; gap: 10px; margin-top: 12px; }
+  button.btn { flex: 1; min-height: 54px; border: 0; border-radius: 14px; font-size: 17px; font-weight: 700; background: #2c4152; color: var(--text); }
+  button.primary { background: var(--accent); color: #2b1600; }
+  .grid3 { display: flex; gap: 8px; margin: 10px 0; }
+  .grid3 div { flex: 1; background: #10181f; border-radius: 10px; padding: 8px 4px; }
+  .grid3 b { display: block; font-size: 20px; } .grid3 span { font-size: 12px; color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 15px; }
+  td { padding: 8px 6px; border-bottom: 1px solid #2c3e4c; text-align: left; }
+  td:last-child { text-align: right; font-weight: 700; }
+  tr.you td { color: var(--gold); }
+  .demo { background: var(--bad); color: #2b0606; font-weight: 800; font-size: 12px; border-radius: 6px; padding: 3px 8px; display: inline-block; }
+  .fine { font-size: 12px; color: var(--muted); margin: 8px 0 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚡ Math Sprint 60</h1>
+  <div class="pill" id="streakPill">🔥 0</div>
+</header>
+<main>
+  <div class="bar"><div id="timeFill"></div></div>
+  <div class="top"><span id="time">60.0s</span><span id="combo"></span><span id="score">0</span></div>
+  <div id="q">Ready?</div>
+  <div id="answers"></div>
+</main>
+<div class="ad" aria-label="advertisement placeholder">AD PLACEHOLDER · 320×50 banner<br>No ad network connected</div>
+
+<div class="overlay show" id="startOv">
+  <div class="card">
+    <h2>⚡ Math Sprint 60</h2>
+    <p class="sub">Answer as many as you can in <b>60 seconds</b>.</p>
+    <p class="sub">5 right in a row = combo multiplier. Wrong answer costs <b>3 seconds</b> and your combo.</p>
+    <p class="sub">Today's questions are <b>the same for everyone</b>. Play daily to keep your 🔥 streak.</p>
+    <div class="grid3"><div><b id="sBest">0</b><span>today's best</span></div><div><b id="sAll">0</b><span>all-time best</span></div><div><b id="sStreak">0</b><span>day streak</span></div></div>
+    <div class="row"><button class="btn primary" id="playBtn">Start sprint</button></div>
+    <div class="row"><button class="btn" id="prizeBtnA">🏆 Prize pool</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="overOv">
+  <div class="card">
+    <h2>Time!</h2>
+    <div class="big" id="oScore">0</div>
+    <div class="newbest" id="oNew"></div>
+    <div class="grid3"><div><b id="oCorrect">0</b><span>correct</span></div><div><b id="oAcc">0%</b><span>accuracy</span></div><div><b id="oCombo">0</b><span>best run</span></div></div>
+    <p class="sub" id="oBest"></p>
+    <div class="row"><button class="btn primary" id="againBtn">Sprint again</button></div>
+    <div class="row"><button class="btn" id="prizeBtnB">🏆 Prize pool</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="prizeOv">
+  <div class="card">
+    <span class="demo">DEMO · NOT REAL MONEY</span>
+    <h2 style="margin-top:10px">Today's prize pool</h2>
+    <p class="sub">Highest daily sprint score (example)</p>
+    <table id="prizeTable"></table>
+    <p class="fine">Prototype only. No payments, no entry fees, no real prizes. Any real reward scheme must be reviewed by a lawyer first.</p>
+    <button class="btn primary" style="width:100%" id="closePrize">Close</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const STORE = 'mathsprint.v1', DURATION = 60, PENALTY = 3;
+  const $ = id => document.getElementById(id);
+  function load() { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch (e) { return {}; } }
+  function save(s) { try { localStorage.setItem(STORE, JSON.stringify(s)); } catch (e) {} }
+  const pad = n => String(n).padStart(2, '0');
+  const keyOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const todayKey = () => keyOf(new Date());
+  const yesterdayKey = () => { const d = new Date(); d.setDate(d.getDate() - 1); return keyOf(d); };
+  function hash(str) { let h = 2166136261; for (const c of str) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+  function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+  function streakNow(s) { return (s.lastDay === todayKey() || s.lastDay === yesterdayKey()) ? (s.streak || 0) : 0; }
+  function todayBest(s) { return s.bestDay === todayKey() ? s.todayBest : 0; }
+
+  // ---------- question generator (seeded: same sequence for everyone today) ----------
+  let rnd;
+  const ri = (a, b) => a + Math.floor(rnd() * (b - a + 1));
+  function makeQ(level) {
+    let a, b, op, ans;
+    const kind = level < 4 ? ri(0, 1) : level < 10 ? ri(0, 2) : level < 18 ? ri(0, 3) : ri(1, 4);
+    switch (kind) {
+      case 0: a = ri(2, 9 + level * 2); b = ri(2, 9 + level * 2); op = '+'; ans = a + b; break;
+      case 1: a = ri(5, 12 + level * 2); b = ri(1, a); op = '−'; ans = a - b; break;
+      case 2: a = ri(2, 6 + Math.floor(level / 3)); b = ri(2, 9); op = '×'; ans = a * b; break;
+      case 3: b = ri(2, 9); ans = ri(2, 9 + Math.floor(level / 4)); a = b * ans; op = '÷'; break;
+      default: a = ri(11, 49); b = ri(11, 49); op = '+'; ans = a + b;
+    }
+    // distractors: near misses that look plausible
+    const opts = new Set([ans]);
+    const deltas = [1, -1, 2, -2, 10, -10, 3, -3, 5, -5];
+    while (opts.size < 4) { const d = deltas[ri(0, deltas.length - 1)]; if (ans + d >= 0) opts.add(ans + d); }
+    const list = [...opts];
+    for (let i = list.length - 1; i > 0; i--) { const j = ri(0, i); [list[i], list[j]] = [list[j], list[i]]; }
+    return { text: `${a} ${op} ${b}`, ans, list };
+  }
+
+  // ---------- state ----------
+  let playing = false, timeLeft, score, correct, wrong, combo, bestCombo, level, cur, lastT, lock = false;
+  const btns = [];
+  for (let i = 0; i < 4; i++) {
+    const b = document.createElement('button'); b.className = 'ans'; b.textContent = '·';
+    b.addEventListener('pointerdown', e => { e.preventDefault(); answer(i); });
+    $('answers').appendChild(b); btns.push(b);
+  }
+
+  function refreshMenu() {
+    const s = load();
+    $('sBest').textContent = todayBest(s); $('sAll').textContent = s.best || 0; $('sStreak').textContent = streakNow(s);
+    $('streakPill').textContent = '🔥 ' + streakNow(s);
+  }
+
+  function start() {
+    rnd = mulberry32(hash('mathsprint-' + todayKey()));
+    playing = true; timeLeft = DURATION; score = 0; correct = 0; wrong = 0; combo = 0; bestCombo = 0; level = 0; lock = false;
+    $('startOv').classList.remove('show'); $('overOv').classList.remove('show');
+    $('score').textContent = '0'; $('combo').textContent = '';
+    next(); lastT = performance.now(); requestAnimationFrame(tick);
+  }
+
+  function next() {
+    cur = makeQ(level);
+    $('q').textContent = cur.text;
+    cur.list.forEach((v, i) => btns[i].textContent = v);
+  }
+
+  const mult = () => 1 + Math.floor(combo / 5);
+
+  function answer(i) {
+    if (!playing || lock) return;
+    const ok = cur.list[i] === cur.ans;
+    if (ok) {
+      score += 10 * mult(); correct++; combo++; bestCombo = Math.max(bestCombo, combo);
+      try { navigator.vibrate && navigator.vibrate(8); } catch (e) {}
+    } else {
+      wrong++; combo = 0; timeLeft -= PENALTY;
+      try { navigator.vibrate && navigator.vibrate([30, 30, 30]); } catch (e) {}
+    }
+    level++; // question index: keeps today's sequence identical for every player
+    $('score').textContent = score;
+    $('combo').textContent = mult() > 1 ? `×${mult()} combo` : (combo ? `${combo} in a row` : '');
+    const q = $('q'); q.classList.remove('good', 'bad'); q.classList.add(ok ? 'good' : 'bad');
+    setTimeout(() => q.classList.remove('good', 'bad'), 160);
+    if (ok) next(); else { lock = true; setTimeout(() => { lock = false; next(); }, 250); } // short pause on wrong, then move on
+  }
+
+  function tick(now) {
+    if (!playing) return;
+    timeLeft -= (now - lastT) / 1000; lastT = now;
+    if (timeLeft <= 0) { timeLeft = 0; end(); }
+    $('time').textContent = timeLeft.toFixed(1) + 's';
+    $('timeFill').style.width = (timeLeft / DURATION * 100) + '%';
+    $('timeFill').style.background = timeLeft < 10 ? 'var(--bad)' : 'var(--accent)';
+    if (playing) requestAnimationFrame(tick);
+  }
+
+  function end() {
+    playing = false;
+    const s = load();
+    const isBest = score > (s.best || 0);
+    const isTodayBest = score > todayBest(s);
+    if (isBest) s.best = score;
+    if (s.bestDay !== todayKey()) { s.bestDay = todayKey(); s.todayBest = 0; }
+    s.todayBest = Math.max(s.todayBest, score);
+    if (s.lastDay !== todayKey()) { s.streak = s.lastDay === yesterdayKey() ? (s.streak || 0) + 1 : 1; s.lastDay = todayKey(); }
+    s.plays = (s.plays || 0) + 1;
+    save(s);
+    $('q').textContent = 'Time!';
+    btns.forEach(b => b.textContent = '·');
+    $('oScore').textContent = score;
+    $('oNew').textContent = isBest && score > 0 ? '★ NEW ALL-TIME BEST ★' : isTodayBest && score > 0 ? '★ NEW BEST TODAY ★' : '';
+    $('oCorrect').textContent = correct;
+    $('oAcc').textContent = (correct + wrong ? Math.round(correct / (correct + wrong) * 100) : 0) + '%';
+    $('oCombo').textContent = bestCombo;
+    $('oBest').textContent = `Today's best ${s.todayBest} · All-time ${s.best || 0} · 🔥 ${streakNow(s)} day streak`;
+    setTimeout(() => $('overOv').classList.add('show'), 400);
+    refreshMenu();
+  }
+
+  // ---------- prize pool (placeholder) ----------
+  function showPrize() {
+    const s = load(); const mine = s.bestDay === todayKey() ? s.todayBest : null;
+    const rows = [['Ava K.', 620], ['Jun P.', 480], ['Sam R.', 410], ['Leo T.', 350], ['Mia D.', 290]];
+    if (mine != null) rows.push(['You', mine]);
+    rows.sort((a, b) => b[1] - a[1]);
+    const prize = ['$10', '$5', '$1', '$1', '$1'];
+    $('prizeTable').innerHTML = rows.slice(0, 6).map((r, i) =>
+      `<tr class="${r[0] === 'You' ? 'you' : ''}"><td>${i + 1}. ${r[0]} · ${r[1]}</td><td>${prize[i] || '—'}</td></tr>`).join('') +
+      (mine == null ? '<tr><td colspan="2" style="color:var(--muted)">Finish a sprint to see your spot</td></tr>' : '');
+    $('prizeOv').classList.add('show');
+  }
+  $('prizeBtnA').addEventListener('click', showPrize);
+  $('prizeBtnB').addEventListener('click', showPrize);
+  $('closePrize').addEventListener('click', () => $('prizeOv').classList.remove('show'));
+  $('playBtn').addEventListener('click', start);
+  $('againBtn').addEventListener('click', start);
+
+  refreshMenu();
+})();
+</script>
+</body>
+</html>
