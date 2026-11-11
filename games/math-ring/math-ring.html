@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0e1424">
+<title>Math Ring · Brain Workout</title>
+<style>
+  :root { --bg: #0e1424; --panel: #1a2340; --panel2: #243058; --text: #f2f5ff; --muted: #9aa6cc;
+    --accent: #7c6cff; --good: #3ddc84; --bad: #ff5d6c; --gold: #ffd54d; --ring: #4de0ff; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  body { display: flex; flex-direction: column; height: 100dvh; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px 4px; }
+  h1 { font-size: 20px; margin: 0; }
+  .pill { background: var(--panel); border-radius: 999px; padding: 6px 12px; font-size: 14px; font-weight: 700; }
+  main { flex: 1; display: flex; flex-direction: column; padding: 8px 16px calc(16px + env(safe-area-inset-bottom)); gap: 12px; max-width: 480px; width: 100%; margin: 0 auto; }
+  .top { display: flex; justify-content: space-between; align-items: flex-end; position: relative; }
+  #time { font-size: 40px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+  #time.low { color: var(--bad); animation: pulse .5s infinite alternate; }
+  @keyframes pulse { to { transform: scale(1.08); } }
+  #scoreBox { text-align: right; } #scoreBox span { display: block; font-size: 12px; color: var(--muted); }
+  #score { font-size: 32px; font-weight: 800; line-height: 1; }
+  .bar { height: 12px; background: var(--panel); border-radius: 99px; overflow: hidden; }
+  #timeFill { height: 100%; width: 50%; background: var(--accent); transition: width .1s linear, background .3s; }
+  .float { position: absolute; left: 42%; top: 0; white-space: nowrap; font-size: 22px; font-weight: 800; pointer-events: none; animation: floatUp .9s ease-out forwards; }
+  @keyframes floatUp { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-40px); } }
+  #levelTag { font-size: 13px; color: var(--muted); text-align: center; min-height: 16px; }
+  #q { flex: 1; display: flex; align-items: center; justify-content: center; font-size: clamp(44px, 14vw, 72px); font-weight: 800;
+    background: var(--panel); border-radius: 20px; min-height: 140px; transition: background .15s; font-variant-numeric: tabular-nums; }
+  #q.good { background: #1e4a36; } #q.bad { background: #52222c; animation: shake .3s; }
+  @keyframes shake { 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+  #answers { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .ans { min-height: 88px; border: 0; border-radius: 18px; background: var(--panel2); color: var(--text); font-size: 34px; font-weight: 800;
+    font-variant-numeric: tabular-nums; transition: transform .08s, background .15s; }
+  .ans:active { transform: scale(.95); }
+  .ans.right { background: var(--good); color: #062612; } .ans.wrong { background: var(--bad); color: #2b0609; }
+
+  .overlay { position: fixed; inset: 0; background: rgba(6,9,20,.92); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+  .overlay.show { display: flex; }
+  .card { background: var(--panel); border-radius: 22px; padding: 24px 20px; width: 100%; max-width: 400px; text-align: center; }
+  .card h2 { margin: 0 0 8px; font-size: 28px; }
+  .rule { font-size: 18px; line-height: 1.4; margin: 8px 0; }
+  .sub { color: var(--muted); font-size: 14px; margin: 6px 0; }
+  .big { font-size: 72px; font-weight: 800; margin: 0; line-height: 1.1; }
+  .newbest { color: var(--gold); font-weight: 800; letter-spacing: 1px; min-height: 22px; font-size: 18px; }
+  .newbest.on { animation: pop .6s ease-out; }
+  @keyframes pop { 0% { transform: scale(.3); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
+  button.btn { width: 100%; min-height: 64px; border: 0; border-radius: 16px; font-size: 20px; font-weight: 800; background: var(--panel2); color: var(--text); margin-top: 12px; }
+  button.primary { background: var(--accent); color: #fff; box-shadow: 0 6px 0 #4e40c9; }
+  button.primary:active { transform: translateY(3px); box-shadow: 0 3px 0 #4e40c9; }
+  button.small { min-height: 48px; font-size: 16px; font-weight: 700; }
+  .brain { font-size: 54px; line-height: 1; }
+  .stats { display: flex; gap: 8px; margin: 12px 0 4px; }
+  .stats div { flex: 1; background: #10172c; border-radius: 12px; padding: 8px 4px; }
+  .stats b { display: block; font-size: 22px; } .stats span { font-size: 12px; color: var(--muted); }
+
+  /* ring screen */
+  #ringOv { flex-direction: column; justify-content: flex-start; padding: 0; background: rgba(6,9,20,.97); }
+  #ringHead { padding: calc(24px + env(safe-area-inset-top)) 16px 0; text-align: center; z-index: 2; pointer-events: none; }
+  #ringHead h2 { margin: 0; font-size: 30px; color: var(--bad); }
+  #ringHead p { margin: 8px 0 0; font-size: 20px; font-weight: 700; }
+  #ringMsg { font-size: 34px; font-weight: 800; height: 44px; margin-top: 8px; color: var(--gold); }
+  #ringCv { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* ad placeholder */
+  #adOv { background: #000; flex-direction: column; }
+  .adbox { width: 100%; max-width: 400px; aspect-ratio: 9 / 12; border: 3px dashed #555; border-radius: 16px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; color: #bbb; gap: 10px; }
+  .adbox b { font-size: 26px; color: #fff; letter-spacing: 1px; }
+  #adCount { font-size: 64px; font-weight: 800; color: #fff; }
+
+  #fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🧠 Math Ring</h1>
+  <div class="pill" id="bestPill">Best 0</div>
+</header>
+<main>
+  <div class="top">
+    <div><div id="time">30.0</div></div>
+    <div id="scoreBox"><div id="score">0</div><span>correct</span></div>
+  </div>
+  <div class="bar"><div id="timeFill"></div></div>
+  <div id="levelTag"></div>
+  <div id="q">?</div>
+  <div id="answers"></div>
+</main>
+
+<!-- start -->
+<div class="overlay show" id="startOv">
+  <div class="card">
+    <div class="brain">🧠</div>
+    <h2>Math Ring</h2>
+    <p class="sub">A quick workout for your brain.</p>
+    <p class="rule">Tap the right answer. <b style="color:var(--good)">Right = +time</b>, <b style="color:var(--bad)">wrong = −time</b>.</p>
+    <p class="rule">Clock hits zero? Hit the <b style="color:var(--ring)">ring</b> once to keep going.</p>
+    <button class="btn primary" id="startBtn">Start</button>
+  </div>
+</div>
+
+<!-- ring last chance -->
+<div class="overlay" id="ringOv">
+  <canvas id="ringCv"></canvas>
+  <div id="ringHead">
+    <h2>⏰ Time's up!</h2>
+    <p>Tap anywhere when the rings line up<br>to win <span id="ringSecs">+10s</span></p>
+    <div id="ringMsg"></div>
+  </div>
+</div>
+
+<!-- offer ad -->
+<div class="overlay" id="offerOv">
+  <div class="card">
+    <h2>So close!</h2>
+    <p class="rule">Keep your run going?</p>
+    <button class="btn primary" id="adBtn">▶ Watch an ad to extend (+<span id="adSecs">10</span>s)</button>
+    <button class="btn small" id="noAdBtn">No thanks, end run</button>
+  </div>
+</div>
+
+<!-- ad placeholder -->
+<div class="overlay" id="adOv">
+  <div class="adbox">
+    <b>Ad placeholder</b>
+    <div>No ad network connected</div>
+    <div id="adCount">5</div>
+    <div>Your time comes back after this</div>
+  </div>
+</div>
+
+<!-- game over -->
+<div class="overlay" id="overOv">
+  <div class="card">
+    <h2>Run over</h2>
+    <p class="sub">Score</p>
+    <p class="big" id="oScore">0</p>
+    <div class="newbest" id="oNew"></div>
+    <p class="sub" id="oBest">Best 0</p>
+    <div class="stats"><div><b id="oAcc">0%</b><span>accuracy</span></div><div><b id="oLevel">1</b><span>level reached</span></div><div><b id="oSaves">0</b><span>saves used</span></div></div>
+    <p class="sub">🧠 Nice workout. Come back tomorrow to keep your mind sharp.</p>
+    <button class="btn primary" id="againBtn">Play again</button>
+  </div>
+</div>
+
+<canvas id="fx"></canvas>
+
+<script>
+// ================= TUNABLE CONSTANTS =================
+const START_TIME      = 30;    // seconds on the clock when a run starts
+const MAX_TIME        = 60;    // the clock can't go above this (also the bar's full width)
+const CORRECT_BONUS   = 2;     // seconds added for a right answer
+const WRONG_PENALTY   = 3;     // seconds taken away for a wrong answer
+const RING_EXTENSION  = 10;    // seconds won by hitting the ring (once per run)
+const AD_EXTENSION    = 10;    // seconds added after the ad placeholder (once per run)
+const AD_SECONDS      = 5;     // length of the ad placeholder screen
+const LEVEL_EVERY     = 4;     // difficulty ramp: right answers needed per level-up
+// Difficulty ramp: one row per level. ops: + − × ÷ allowed. max: biggest number in +/−. tab: biggest times table.
+const LEVELS = [
+  { ops: '+',    max: 9 },
+  { ops: '+-',   max: 15 },
+  { ops: '+-',   max: 30 },
+  { ops: '+-x',  max: 30,  tab: 5 },
+  { ops: '+-x',  max: 50,  tab: 9 },
+  { ops: '+-x/', max: 100, tab: 10 },
+  { ops: '+-x/', max: 100, tab: 12 },
+  { ops: '+-x/', max: 200, tab: 15 },
+  { ops: '+-x/', max: 500, tab: 20 },
+];
+const WRONG_PAUSE_MS  = 500;   // how long the right answer is shown after a mistake
+const RING_DELAY      = 1.0;   // seconds the ring waits before shrinking (taps ignored, so a late answer tap can't waste it)
+const RING_START      = 0.46;  // ring start size (fraction of the screen's short side)
+const RING_TARGET     = 0.18;  // white target ring size (fraction)
+const RING_SPEED      = 0.22;  // shrink speed (fraction per second)
+const RING_WINDOW     = 0.05;  // hit tolerance (fraction); bigger = easier
+const SOUND_ON        = true;
+// =====================================================
+
+(() => {
+  const STORE = 'mathring.v1';
+  const $ = id => document.getElementById(id);
+  const load = () => { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch (e) { return {}; } };
+  const save = s => { try { localStorage.setItem(STORE, JSON.stringify(s)); } catch (e) {} };
+  const show = id => $(id).classList.add('show');
+  const hide = id => $(id).classList.remove('show');
+  const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
+
+  // ---------- sound ----------
+  let ac = null;
+  function beep(freq, dur = 0.08, type = 'sine', vol = 0.15) {
+    if (!SOUND_ON) return;
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = type; o.frequency.value = freq; g.gain.value = vol;
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + dur);
+      o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + dur);
+    } catch (e) {}
+  }
+  const chord = () => [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, 0.18, 'triangle'), i * 80));
+
+  // ---------- confetti / win animation ----------
+  const fx = $('fx'), fctx = fx.getContext('2d'); let bits = [], fxOn = false;
+  function confetti(n = 120) {
+    fx.width = innerWidth * devicePixelRatio; fx.height = innerHeight * devicePixelRatio;
+    fctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    for (let i = 0; i < n; i++) bits.push({ x: innerWidth / 2, y: innerHeight * 0.4, vx: (Math.random() - .5) * 700, vy: -200 - Math.random() * 600,
+      r: Math.random() * 6, c: `hsl(${Math.random() * 360},90%,60%)`, life: 1.6 + Math.random() });
+    if (!fxOn) { fxOn = true; let t0 = performance.now(); requestAnimationFrame(function step(now) {
+      const dt = Math.min(.05, (now - t0) / 1000); t0 = now;
+      fctx.clearRect(0, 0, innerWidth, innerHeight);
+      bits.forEach(b => { b.vy += 900 * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt; b.r += dt * 4;
+        fctx.fillStyle = b.c; fctx.fillRect(b.x, b.y, 7, 7 + Math.sin(b.r) * 4); });
+      bits = bits.filter(b => b.life > 0 && b.y < innerHeight + 20);
+      if (bits.length) requestAnimationFrame(step); else { fxOn = false; fctx.clearRect(0, 0, innerWidth, innerHeight); }
+    }); }
+  }
+
+  // ---------- questions ----------
+  const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+  function makeQ(levelIdx) {
+    const L = LEVELS[Math.min(levelIdx, LEVELS.length - 1)];
+    const op = L.ops[ri(0, L.ops.length - 1)];
+    let a, b, ans, sym;
+    if (op === '+') { a = ri(1, L.max); b = ri(1, L.max); ans = a + b; sym = '+'; }
+    else if (op === '-') { a = ri(2, L.max); b = ri(1, a); ans = a - b; sym = '−'; }
+    else if (op === 'x') { a = ri(2, L.tab); b = ri(2, Math.min(L.tab, 12)); ans = a * b; sym = '×'; }
+    else { b = ri(2, Math.min(L.tab, 12)); ans = ri(2, L.tab); a = b * ans; sym = '÷'; }
+    // plausible wrong answers: near misses and common slips
+    const cands = [1, -1, 2, -2, 10, -10, 3, -3].map(d => ans + d);
+    if (op === 'x') cands.push(ans + a, ans - a, ans + b, ans - b);
+    const opts = new Set([ans]);
+    while (opts.size < 4) { const v = cands[ri(0, cands.length - 1)]; if (v >= 0) opts.add(v); }
+    const list = [...opts].sort(() => Math.random() - .5);
+    return { text: `${a} ${sym} ${b}`, ans, list };
+  }
+
+  // ---------- state ----------
+  // phase: menu | quiz | ring | offer | ad | over
+  let phase = 'menu', time, score, wrong, cur, lock, lastT, ringUsed, adUsed, saves;
+  const level = () => Math.floor(score / LEVEL_EVERY);
+  const btns = [];
+  for (let i = 0; i < 4; i++) {
+    const b = document.createElement('button'); b.className = 'ans'; b.textContent = '·';
+    b.addEventListener('pointerdown', e => { e.preventDefault(); answer(i); });
+    $('answers').appendChild(b); btns.push(b);
+  }
+  const updatePill = () => $('bestPill').textContent = 'Best ' + (load().best || 0);
+
+  function floatText(txt, color) {
+    const el = document.createElement('div'); el.className = 'float'; el.textContent = txt; el.style.color = color;
+    document.querySelector('.top').appendChild(el); setTimeout(() => el.remove(), 900);
+  }
+  function addTime(s) { time = Math.max(0, Math.min(MAX_TIME, time + s)); }
+
+  function startRun() {
+    time = START_TIME; score = 0; wrong = 0; lock = false; ringUsed = false; adUsed = false; saves = 0;
+    ['startOv', 'overOv', 'offerOv', 'ringOv', 'adOv'].forEach(hide);
+    $('score').textContent = '0';
+    nextQ(); resumeQuiz();
+  }
+  function resumeQuiz() { phase = 'quiz'; lastT = performance.now(); requestAnimationFrame(tick); }
+
+  function nextQ() {
+    cur = makeQ(level());
+    $('q').textContent = cur.text;
+    btns.forEach((b, i) => { b.textContent = cur.list[i]; b.classList.remove('right', 'wrong'); });
+    $('levelTag').textContent = 'Level ' + (Math.min(level(), LEVELS.length - 1) + 1);
+  }
+
+  function answer(i) {
+    if (phase !== 'quiz' || lock) return;
+    const ok = cur.list[i] === cur.ans;
+    const q = $('q'); q.classList.remove('good', 'bad'); void q.offsetWidth;
+    if (ok) {
+      const before = level();
+      score++; addTime(CORRECT_BONUS); floatText(`+${CORRECT_BONUS}s`, 'var(--good)');
+      q.classList.add('good'); setTimeout(() => q.classList.remove('good'), 160);
+      buzz(8); beep(660 + Math.min(score, 30) * 12, 0.07, 'triangle');
+      $('score').textContent = score;
+      if (level() > before && level() < LEVELS.length) { floatText('Level up!', 'var(--gold)'); beep(880, .12, 'triangle'); }
+      nextQ();
+    } else {
+      wrong++; addTime(-WRONG_PENALTY); floatText(`−${WRONG_PENALTY}s`, 'var(--bad)');
+      q.classList.add('bad'); buzz([30, 30, 30]); beep(160, 0.18, 'square', 0.08);
+      btns[i].classList.add('wrong'); btns[cur.list.indexOf(cur.ans)].classList.add('right');
+      lock = true;
+      setTimeout(() => { lock = false; q.classList.remove('bad'); if (phase === 'quiz') nextQ(); }, WRONG_PAUSE_MS);
+    }
+    drawClock();
+  }
+
+  function drawClock() {
+    $('time').textContent = time.toFixed(1);
+    $('time').classList.toggle('low', time < 5 && phase === 'quiz');
+    $('timeFill').style.width = (time / MAX_TIME * 100) + '%';
+    $('timeFill').style.background = time < 5 ? 'var(--bad)' : time < 10 ? 'var(--gold)' : 'var(--accent)';
+  }
+
+  function tick(now) {
+    if (phase !== 'quiz') return;
+    time -= (now - lastT) / 1000; lastT = now;
+    if (time <= 0) { time = 0; drawClock(); outOfTime(); return; }
+    drawClock();
+    requestAnimationFrame(tick);
+  }
+
+  function outOfTime() {
+    lock = false;
+    if (!ringUsed) startRing();
+    else if (!adUsed) offerAd();
+    else gameOver();
+  }
+
+  // ---------- ring last chance (reuses the Pulse reflex mechanic) ----------
+  const cv = $('ringCv'), ctx = cv.getContext('2d');
+  let W, H, ringR, ringT, ringDone, parts = [], ringResult = null;
+  const base = () => Math.min(W, H);
+  function startRing() {
+    ringUsed = true; phase = 'ring'; ringDone = false; ringResult = null; parts = [];
+    show('ringOv'); $('ringMsg').textContent = 'Get ready…'; $('ringSecs').textContent = `+${RING_EXTENSION}s`;
+    const r = $('ringOv').getBoundingClientRect(); W = r.width; H = r.height;
+    cv.width = W * devicePixelRatio; cv.height = H * devicePixelRatio; ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    ringR = base() * RING_START; ringT = 0; buzz([60, 40, 60]); beep(300, .2, 'sawtooth', .06);
+    let t0 = performance.now();
+    requestAnimationFrame(function step(now) {
+      const dt = Math.min(.05, (now - t0) / 1000); t0 = now;
+      ringT += dt;
+      if (!ringDone && ringT > RING_DELAY) {
+        if ($('ringMsg').textContent === 'Get ready…') $('ringMsg').textContent = 'TAP!';
+        ringR -= base() * RING_SPEED * dt;
+        if (ringR < base() * (RING_TARGET - RING_WINDOW)) ringTap(true);
+      }
+      parts.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; }); parts = parts.filter(p => p.life > 0);
+      drawRing();
+      if (phase === 'ring') requestAnimationFrame(step);
+    });
+  }
+  function drawRing() {
+    ctx.clearRect(0, 0, W, H);
+    const cx = W / 2, cy = H * 0.58, tR = base() * RING_TARGET;
+    const hue = ringResult === 'hit' ? 140 : ringResult === 'miss' ? 350 : 190;
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, base() * .6);
+    g.addColorStop(0, `hsla(${hue},90%,55%,.18)`); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = `hsla(${hue},90%,60%,.2)`; ctx.lineWidth = base() * RING_WINDOW * 2;
+    ctx.beginPath(); ctx.arc(cx, cy, tR, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(cx, cy, tR, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = ringResult === 'miss' ? '#ff5d6c' : ringResult === 'hit' ? '#3ddc84' : '#4de0ff';
+    ctx.lineWidth = 8; ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = 18;
+    ctx.beginPath(); ctx.arc(cx, cy, Math.max(4, ringR), 0, Math.PI * 2); ctx.stroke(); ctx.shadowBlur = 0;
+    parts.forEach(p => { ctx.fillStyle = `hsla(140,95%,65%,${p.life / .8})`; ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill(); });
+  }
+  function ringTap(passed) {
+    if (phase !== 'ring' || ringDone || ringT <= RING_DELAY) return;
+    ringDone = true;
+    const hit = !passed && Math.abs(ringR - base() * RING_TARGET) <= base() * RING_WINDOW;
+    ringResult = hit ? 'hit' : 'miss';
+    if (hit) {
+      $('ringMsg').textContent = `+${RING_EXTENSION}s! 🎉`;
+      const cx = W / 2, cy = H * 0.58;
+      for (let i = 0; i < 40; i++) { const a = Math.random() * Math.PI * 2, v = 100 + Math.random() * 300;
+        parts.push({ x: cx + Math.cos(a) * ringR, y: cy + Math.sin(a) * ringR, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: .8 }); }
+      buzz(30); chord(); confetti(80);
+      saves++;
+      setTimeout(() => { hide('ringOv'); addTime(RING_EXTENSION); floatText(`+${RING_EXTENSION}s`, 'var(--ring)'); nextQ(); resumeQuiz(); }, 1300);
+    } else {
+      $('ringMsg').textContent = passed ? 'Too late!' : 'Missed!';
+      buzz([40, 40, 80]); beep(140, .3, 'square', .08);
+      setTimeout(() => { hide('ringOv'); phase = 'ringDone'; adUsed ? gameOver() : offerAd(); }, 1100);
+    }
+  }
+  $('ringOv').addEventListener('pointerdown', e => { e.preventDefault(); ringTap(false); });
+
+  // ---------- ad extension (placeholder) ----------
+  function offerAd() { phase = 'offer'; $('adSecs').textContent = AD_EXTENSION; show('offerOv'); }
+  $('adBtn').addEventListener('click', () => {
+    if (phase !== 'offer') return;
+    adUsed = true; saves++; phase = 'ad'; hide('offerOv'); show('adOv');
+    let left = AD_SECONDS; $('adCount').textContent = left;
+    const iv = setInterval(() => {
+      left--; $('adCount').textContent = Math.max(left, 0);
+      if (left <= 0) { clearInterval(iv); hide('adOv'); addTime(AD_EXTENSION); floatText(`+${AD_EXTENSION}s`, 'var(--gold)'); nextQ(); resumeQuiz(); }
+    }, 1000);
+  });
+  $('noAdBtn').addEventListener('click', () => { if (phase === 'offer') { hide('offerOv'); gameOver(); } });
+
+  // ---------- game over ----------
+  function gameOver() {
+    phase = 'over'; drawClock();
+    const s = load(); const isBest = score > (s.best || 0);
+    if (isBest) s.best = score; s.plays = (s.plays || 0) + 1; save(s);
+    $('oScore').textContent = score;
+    $('oBest').textContent = 'Best ' + (s.best || 0);
+    const nb = $('oNew'); nb.classList.remove('on'); void nb.offsetWidth;
+    nb.textContent = isBest && score > 0 ? '★ NEW BEST ★' : ''; if (isBest && score > 0) nb.classList.add('on');
+    $('oAcc').textContent = (score + wrong ? Math.round(score / (score + wrong) * 100) : 0) + '%';
+    $('oLevel').textContent = Math.min(level(), LEVELS.length - 1) + 1;
+    $('oSaves').textContent = saves;
+    show('overOv'); updatePill();
+    if (isBest && score > 0) { confetti(160); chord(); }
+  }
+
+  $('startBtn').addEventListener('click', startRun);
+  $('againBtn').addEventListener('click', startRun);
+
+  // test hook (read-only peek for the automated smoke test)
+  window.__mathRing = { get phase() { return phase; }, get time() { return time; }, get ans() { return cur && cur.ans; },
+    get ringR() { return ringR; }, get ringTarget() { return base() * RING_TARGET; }, get ringWindow() { return base() * RING_WINDOW; },
+    set time(v) { time = v; } };
+
+  time = START_TIME; drawClock(); updatePill();
+})();
+</script>
+</body>
+</html>
