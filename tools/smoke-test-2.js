@@ -83,6 +83,41 @@ const want = n => !only.length || only.includes(n);
     await ctx.close();
   }
 
+  // ---------- Tower Drop ----------
+  if (want('tower-drop')) {
+    const { page, errs, ctx } = await open('tower-drop/tower-drop.html');
+    const G = expr => page.evaluate(expr);
+    await page.screenshot({ path: SHOT + 'td-start.png' });
+    await page.click('#startBtn');
+    const dropAt = async (target, tol) => {
+      await page.waitForFunction(([t, tol]) => !__tower.dropping && Math.abs(__tower.offset - t) < tol, [target, tol], { polling: 'raf', timeout: 15000 });
+      await page.mouse.click(195, 500);
+      await page.waitForFunction(() => !__tower.dropping, null, { timeout: 3000 });
+      await page.waitForTimeout(50);
+    };
+    const w0 = await G('__tower.width');
+    await dropAt(30, 6);                        // sloppy: overhang cut, block shrinks
+    const w1 = await G('__tower.width');
+    for (let i = 0; i < 5; i++) await dropAt(0, 3);  // perfect drops build a combo
+    const combo = await G('__tower.combo'); const w2 = await G('__tower.width');
+    await page.screenshot({ path: SHOT + 'td-play.png' });
+    // a full miss ends the game
+    // keep making very sloppy drops: the block shrinks each time until one misses the tower
+    let sloppy = 0;
+    while (await G('__tower.phase') === 'play' && sloppy < 25) {
+      await page.waitForFunction(() => !__tower.dropping && Math.abs(__tower.offset) > __tower.width * 0.8, null, { polling: 'raf', timeout: 15000 });
+      await page.mouse.click(195, 500); sloppy++;
+      await page.waitForFunction(() => !__tower.dropping || __tower.phase === 'over', null, { timeout: 3000 });
+      await page.waitForTimeout(50);
+    }
+    await page.waitForSelector('#overOv.show', { timeout: 3000 });
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: SHOT + 'td-over.png' });
+    results.towerDrop = { startWidth: Math.round(w0), widthAfterSloppy: Math.round(w1), comboAfter5Perfect: combo, widthAfterCombo: Math.round(w2),
+      floors: await page.textContent('#oScore'), newBest: await page.textContent('#oNew'), best: await page.textContent('#oBest'), errs };
+    await ctx.close();
+  }
+
   console.log(JSON.stringify(results, null, 2));
   await browser.close();
 })().catch(e => { console.error(e); process.exit(1); });
