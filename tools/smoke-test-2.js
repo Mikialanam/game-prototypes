@@ -118,6 +118,64 @@ const want = n => !only.length || only.includes(n);
     await ctx.close();
   }
 
+  // ---------- Train Switcher ----------
+  if (want('train-switcher')) {
+    const { page, errs, ctx } = await open('train-switcher/train-switcher.html');
+    const snap = () => page.evaluate(() => __trains.snapshot());
+    await page.screenshot({ path: SHOT + 'ts-start.png' });
+    await page.click('#startBtn');
+    // bot: point each switch at the branch the next approaching train needs
+    const playLevel = async () => {
+      for (let i = 0; i < 1200; i++) {
+        const ph = await page.evaluate(() => __trains.phase); if (ph !== 'play') return ph;
+        const s = await snap();
+        for (const sw of s.switches) {
+          const next = s.trains.filter(t => t.at === sw.id).sort((a, b) => a.d - b.d)[0];
+          if (!next) continue;
+          const want = s.routes[sw.id][next.colour];
+          if (want !== sw.state && !sw.busy) await page.mouse.click(sw.x, sw.y);
+        }
+        await page.waitForTimeout(40);
+      }
+      return 'timeout';
+    };
+    const levels = [];
+    for (let L = 1; L <= 4; L++) {
+      const r = await playLevel(); levels.push(r);
+      if (L === 2) await page.screenshot({ path: SHOT + 'ts-win.png' });
+      if (r !== 'win') break;
+      await page.waitForSelector('#winOv.show');
+      await page.click('#nextBtn');
+      await page.waitForTimeout(300);
+      if (L === 3) await page.waitForTimeout(3000), await page.screenshot({ path: SHOT + 'ts-play.png' });
+    }
+    // force a crash: flip a switch while a train is on it
+    let crashed = false;
+    for (let i = 0; i < 400 && !crashed; i++) {
+      const s = await snap(); const busy = s.switches.find(w => w.busy);
+      if (busy) { await page.mouse.click(busy.x, busy.y); crashed = true; } else await page.waitForTimeout(30);
+    }
+    await page.waitForSelector('#failOv.show', { timeout: 4000 });
+    await page.screenshot({ path: SHOT + 'ts-crash.png' });
+    const crashTitle = await page.textContent('#failTitle');
+    // wrong station: leave switches pointing the wrong way
+    await page.click('#retryBtn');
+    let wrongOk = false;
+    for (let i = 0; i < 600; i++) {
+      const ph = await page.evaluate(() => __trains.phase); if (ph !== 'play') break;
+      const s = await snap();
+      for (const sw of s.switches) {
+        const next = s.trains.filter(t => t.at === sw.id).sort((a, b) => a.d - b.d)[0];
+        if (next && s.routes[sw.id][next.colour] === sw.state && !sw.busy) await page.mouse.click(sw.x, sw.y);
+      }
+      await page.waitForTimeout(40);
+    }
+    await page.waitForSelector('#failOv.show', { timeout: 4000 });
+    const wrongTitle = await page.textContent('#failTitle');
+    results.trainSwitcher = { levels, crashTitle, wrongTitle, bestPill: await page.textContent('#bestPill'), errs };
+    await ctx.close();
+  }
+
   console.log(JSON.stringify(results, null, 2));
   await browser.close();
 })().catch(e => { console.error(e); process.exit(1); });

@@ -8,6 +8,7 @@ Tiny mobile game prototypes. Each one is a single self-contained HTML file: open
 |---|---|---|---|
 | Math Ring | Brain workout: math sprint + one ring save | [games/math-ring/math-ring.html](games/math-ring/math-ring.html) | [README](games/math-ring/README.md) |
 | Tower Drop | Tap-to-stack, perfect-drop combos | [games/tower-drop/tower-drop.html](games/tower-drop/tower-drop.html) | [README](games/tower-drop/README.md) |
+| Train Switcher | Routing puzzle, levels | [games/train-switcher/train-switcher.html](games/train-switcher/train-switcher.html) | [README](games/train-switcher/README.md) |
 | Glow Grid | Daily puzzle, streak | [games/glow-grid/glow-grid.html](games/glow-grid/glow-grid.html) | [README](games/glow-grid/README.md) |
 | Pulse | One-tap reflex, high score | [games/pulse/pulse.html](games/pulse/pulse.html) | [README](games/pulse/README.md) |
 | Math Sprint 60 | 60-second math sprint | [games/math-sprint/math-sprint.html](games/math-sprint/math-sprint.html) | [README](games/math-sprint/README.md) |

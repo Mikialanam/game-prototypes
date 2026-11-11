@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#16261d">
+<title>Train Switcher</title>
+<style>
+  :root { --bg: #16261d; --panel: #213a2c; --text: #f0fff5; --muted: #a3c4b0; --accent: #ffcc33; --good: #3ddc84; --bad: #ff5d5d; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; touch-action: none; user-select: none; -webkit-user-select: none; }
+  body { display: flex; flex-direction: column; height: 100dvh; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px 4px; gap: 8px; }
+  h1 { font-size: 20px; margin: 0; }
+  .pill { background: var(--panel); border-radius: 999px; padding: 6px 12px; font-size: 14px; font-weight: 700; white-space: nowrap; }
+  #bar { display: flex; justify-content: space-between; padding: 0 16px; font-weight: 800; font-size: 18px; }
+  #stage { position: relative; flex: 1; margin-bottom: env(safe-area-inset-bottom); }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .overlay { position: fixed; inset: 0; background: rgba(6,14,9,.88); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+  .overlay.show { display: flex; }
+  .card { background: var(--panel); border-radius: 22px; padding: 24px 20px; width: 100%; max-width: 400px; text-align: center; }
+  .card h2 { margin: 0 0 8px; font-size: 28px; }
+  .rule { font-size: 18px; line-height: 1.4; margin: 8px 0; }
+  .sub { color: var(--muted); font-size: 14px; margin: 6px 0; }
+  .emoji { font-size: 54px; line-height: 1; }
+  .newbest { color: var(--accent); font-weight: 800; letter-spacing: 1px; min-height: 22px; font-size: 18px; }
+  .pop { animation: pop .6s ease-out; }
+  @keyframes pop { 0% { transform: scale(.3); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
+  button.btn { width: 100%; min-height: 64px; border: 0; border-radius: 16px; font-size: 20px; font-weight: 800; margin-top: 12px;
+    background: var(--accent); color: #2e2300; box-shadow: 0 6px 0 #c49a1c; }
+  button.btn:active { transform: translateY(3px); box-shadow: 0 3px 0 #c49a1c; }
+  button.ghost { background: transparent; color: var(--muted); box-shadow: none; min-height: 44px; font-size: 16px; font-weight: 700; }
+  #fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🚂 Train Switcher</h1>
+  <div class="pill" id="bestPill">Best level 0</div>
+</header>
+<div id="bar"><span id="lvl">Level 1</span><span id="count">0 / 0</span></div>
+<div id="stage"><canvas id="cv"></canvas></div>
+
+<div class="overlay show" id="startOv">
+  <div class="card">
+    <div class="emoji">🚂</div>
+    <h2>Train Switcher</h2>
+    <p class="rule"><b>Tap a switch</b> ⭮ to send each train to the station of <b>its colour</b>.</p>
+    <p class="rule">Don't flip a switch while a train is <b style="color:var(--bad)">on it</b>, or it crashes.</p>
+    <button class="btn" id="startBtn">Start</button>
+  </div>
+</div>
+
+<div class="overlay" id="winOv">
+  <div class="card">
+    <div class="emoji">🎉</div>
+    <h2 id="winTitle">Level 1 complete!</h2>
+    <div class="newbest" id="winNew"></div>
+    <p class="sub" id="winSub"></p>
+    <button class="btn" id="nextBtn">Next level</button>
+  </div>
+</div>
+
+<div class="overlay" id="failOv">
+  <div class="card">
+    <div class="emoji" id="failEmoji">💥</div>
+    <h2 id="failTitle">Crash!</h2>
+    <p class="rule" id="failWhy"></p>
+    <p class="sub" id="failBest"></p>
+    <button class="btn" id="retryBtn">Try again</button>
+    <button class="btn ghost" id="restartBtn">Start over from level 1</button>
+  </div>
+</div>
+<canvas id="fx"></canvas>
+
+<script>
+// ================= TUNABLE CONSTANTS =================
+// One row per level: number of stations (2-4), trains to deliver, speed (screen heights per second), seconds between trains.
+const LEVELS = [
+  { stations: 2, trains: 5,  speed: 0.14, gap: 2.8 },
+  { stations: 3, trains: 7,  speed: 0.15, gap: 2.5 },
+  { stations: 3, trains: 9,  speed: 0.17, gap: 2.2 },
+  { stations: 4, trains: 10, speed: 0.18, gap: 2.0 },
+  { stations: 4, trains: 12, speed: 0.20, gap: 1.8 },
+  { stations: 4, trains: 14, speed: 0.22, gap: 1.6 },
+];
+const EXTRA_TRAINS_PER_LEVEL = 2;    // after the table runs out: trains added per level
+const EXTRA_SPEED_PER_LEVEL  = 1.06; // ...speed multiplier per level
+const EXTRA_GAP_PER_LEVEL    = 0.94; // ...gap multiplier per level
+const MIN_GAP                = 1.0;  // seconds; trains never come closer than this
+const SWITCH_ZONE            = 26;   // px either side of a switch that counts as "train on it"
+const CAR_COUNT              = 3;    // cars per train (engine included)
+const CAR_SPACING            = 22;   // px between cars
+const TAP_RADIUS             = 60;   // px: how close a tap must be to a switch
+const COLOURS = ['#ff5d5d', '#4da3ff', '#ffcc33', '#b46bff']; // red, blue, yellow, purple
+const SOUND_ON               = true;
+// =====================================================
+
+(() => {
+  const STORE = 'trainswitcher.v1';
+  const $ = id => document.getElementById(id);
+  const load = () => { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch (e) { return {}; } };
+  const save = s => { try { localStorage.setItem(STORE, JSON.stringify(s)); } catch (e) {} };
+  const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
+  let ac = null;
+  function beep(freq, dur = 0.08, type = 'triangle', vol = 0.15) {
+    if (!SOUND_ON) return;
+    try { ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      const o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.value = freq; g.gain.value = vol;
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + dur); o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + dur);
+    } catch (e) {}
+  }
+  const fx = $('fx'), fctx = fx.getContext('2d'); let bits = [], fxOn = false;
+  function confetti(n = 140) {
+    fx.width = innerWidth * devicePixelRatio; fx.height = innerHeight * devicePixelRatio; fctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    for (let i = 0; i < n; i++) bits.push({ x: innerWidth / 2, y: innerHeight * .4, vx: (Math.random() - .5) * 700, vy: -200 - Math.random() * 600, r: Math.random() * 6, c: `hsl(${Math.random() * 360},90%,60%)`, life: 1.6 + Math.random() });
+    if (fxOn) return; fxOn = true; let t0 = performance.now();
+    requestAnimationFrame(function step(now) { const dt = Math.min(.05, (now - t0) / 1000); t0 = now; fctx.clearRect(0, 0, innerWidth, innerHeight);
+      bits.forEach(b => { b.vy += 900 * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt; b.r += dt * 4; fctx.fillStyle = b.c; fctx.fillRect(b.x, b.y, 7, 7 + Math.sin(b.r) * 4); });
+      bits = bits.filter(b => b.life > 0 && b.y < innerHeight + 20);
+      if (bits.length) requestAnimationFrame(step); else { fxOn = false; fctx.clearRect(0, 0, innerWidth, innerHeight); } });
+  }
+
+  // ---------- layouts (x, y as fractions of the play area) ----------
+  // e = entry, s = switch, a-d = stations. next: where each node leads.
+  const LAYOUTS = {
+    2: { e: [.5, -.08, ['s1']], s1: [.5, .34, ['a', 'b']], a: [.2, .86], b: [.8, .86] },
+    3: { e: [.5, -.08, ['s1']], s1: [.5, .24, ['a', 's2']], a: [.17, .86], s2: [.66, .52, ['b', 'c']], b: [.48, .86], c: [.86, .86] },
+    4: { e: [.5, -.08, ['s1']], s1: [.5, .2, ['s2', 's3']], s2: [.28, .5, ['a', 'b']], s3: [.72, .5, ['c', 'd']],
+         a: [.11, .86], b: [.39, .86], c: [.61, .86], d: [.89, .86] },
+  };
+
+  const cv = $('cv'), ctx = cv.getContext('2d'); let W = 0, H = 0;
+  function resize() { const r = $('stage').getBoundingClientRect(); W = r.width; H = r.height;
+    cv.width = W * devicePixelRatio; cv.height = H * devicePixelRatio; ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0); }
+  addEventListener('resize', resize); resize();
+
+  function levelCfg(n) { // n is 1-based
+    if (n <= LEVELS.length) return LEVELS[n - 1];
+    const L = LEVELS[LEVELS.length - 1], k = n - LEVELS.length;
+    return { stations: L.stations, trains: L.trains + k * EXTRA_TRAINS_PER_LEVEL,
+      speed: L.speed * Math.pow(EXTRA_SPEED_PER_LEVEL, k), gap: Math.max(MIN_GAP, L.gap * Math.pow(EXTRA_GAP_PER_LEVEL, k)) };
+  }
+
+  // ---------- state ----------
+  let phase = 'menu', level = 1, cfg, nodes, switches, trains, spawned, delivered, spawnT, last, crashAt, flashes;
+  const P = id => ({ x: nodes[id].x * W, y: nodes[id].y * H });
+  const dist = (a, b) => Math.hypot(P(a).x - P(b).x, P(a).y - P(b).y);
+
+  function buildLevel() {
+    cfg = levelCfg(level);
+    const lay = LAYOUTS[cfg.stations]; nodes = {}; switches = [];
+    let ci = 0;
+    for (const id in lay) {
+      const [x, y, next] = lay[id];
+      nodes[id] = { id, x, y, next: next || null, kind: id === 'e' ? 'entry' : id[0] === 's' ? 'switch' : 'station', state: 0, pulse: 0 };
+      if (nodes[id].kind === 'station') nodes[id].colour = COLOURS[ci++];
+      if (nodes[id].kind === 'switch') { nodes[id].state = Math.random() < .5 ? 0 : 1; switches.push(nodes[id]); }
+    }
+    trains = []; spawned = 0; delivered = 0; spawnT = 0.6; crashAt = null; flashes = [];
+    updateBar();
+  }
+  function updateBar() { $('lvl').textContent = 'Level ' + level; $('count').textContent = `🚉 ${delivered} / ${cfg.trains}`; }
+
+  function spawn() {
+    const stationIds = Object.keys(nodes).filter(k => nodes[k].kind === 'station');
+    const target = nodes[stationIds[Math.floor(Math.random() * stationIds.length)]];
+    const first = nodes.e.next[0];
+    trains.push({ colour: target.colour, route: ['e', first], cum: [0, dist('e', first)], d: 0 });
+    spawned++;
+  }
+
+  function pointAt(t, s) {
+    const r = t.route, c = t.cum;
+    let i = 0; while (i < r.length - 2 && s > c[i + 1]) i++;
+    const a = P(r[i]), b = P(r[i + 1]), len = c[i + 1] - c[i] || 1, k = (s - c[i]) / len;
+    return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, ang: Math.atan2(b.y - a.y, b.x - a.x) };
+  }
+  const trainLen = () => (CAR_COUNT - 1) * CAR_SPACING + 12;
+
+  function occupied(sw) {
+    return trains.some(t => { const i = t.route.indexOf(sw.id); if (i < 0) return false;
+      const rel = t.d - t.cum[i]; return rel > -SWITCH_ZONE && rel < trainLen() + SWITCH_ZONE; });
+  }
+
+  function start(n) {
+    level = n; buildLevel(); phase = 'play';
+    ['startOv', 'winOv', 'failOv'].forEach(id => $(id).classList.remove('show'));
+  }
+
+  function flip(sw) {
+    if (phase !== 'play') return;
+    if (occupied(sw)) { const p = P(sw.id); crash(p.x, p.y); return; }
+    sw.state = 1 - sw.state; sw.pulse = 1; beep(440, .05, 'square', .06); buzz(6);
+  }
+
+  function crash(x, y) {
+    phase = 'fail'; crashAt = { x, y, t: 0 }; buzz([60, 40, 100]); beep(90, .5, 'sawtooth', .12);
+    setTimeout(() => fail('💥', 'Crash!', 'A switch was flipped under a train.'), 900);
+  }
+  function wrongStation(st) {
+    phase = 'fail'; st.pulse = -1; buzz([40, 40, 80]); beep(150, .35, 'square', .08);
+    setTimeout(() => fail('😬', 'Wrong station!', 'Each train must reach the station of its own colour.'), 700);
+  }
+  function fail(emoji, title, why) {
+    $('failEmoji').textContent = emoji; $('failTitle').textContent = title; $('failWhy').textContent = why;
+    $('failBest').textContent = `Level ${level} · best level cleared: ${load().best || 0}`;
+    $('failOv').classList.add('show');
+  }
+  function win() {
+    phase = 'win';
+    const s = load(); const isBest = level > (s.best || 0); if (isBest) s.best = level; save(s); updatePill();
+    $('winTitle').textContent = `Level ${level} complete!`;
+    const nb = $('winNew'); nb.classList.remove('pop'); void nb.offsetWidth; nb.textContent = isBest ? '★ NEW BEST LEVEL ★' : ''; if (isBest) nb.classList.add('pop');
+    const nx = levelCfg(level + 1);
+    $('winSub').textContent = `Next: ${nx.trains} trains, ${nx.stations} stations, ${Math.round(nx.speed / cfg.speed * 100 - 100) > 0 ? 'faster' : 'same speed'}.`;
+    setTimeout(() => { $('winOv').classList.add('show'); confetti(); [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, .18), i * 80)); }, 500);
+  }
+  const updatePill = () => $('bestPill').textContent = 'Best level ' + (load().best || 0);
+
+  // ---------- loop ----------
+  function frame(now) {
+    const dt = Math.min(.05, (now - (last || now)) / 1000); last = now;
+    if (phase === 'play') {
+      spawnT -= dt;
+      if (spawned < cfg.trains && spawnT <= 0) { spawn(); spawnT = cfg.gap; }
+      for (const t of [...trains]) {
+        t.d += cfg.speed * H * dt;
+        while (phase === 'play' && t.d >= t.cum[t.cum.length - 1]) {
+          const n = nodes[t.route[t.route.length - 1]];
+          if (n.kind === 'station') {
+            trains.splice(trains.indexOf(t), 1);
+            if (n.colour === t.colour) { delivered++; n.pulse = 1; updateBar(); beep(660 + delivered * 30, .12); buzz(12);
+              flashes.push({ x: n.x * W, y: n.y * H, t: 0 });
+              if (delivered === cfg.trains) win(); }
+            else wrongStation(n);
+            break;
+          }
+          const nextId = n.kind === 'switch' ? n.next[n.state] : n.next[0];
+          t.route.push(nextId); t.cum.push(t.cum[t.cum.length - 1] + dist(n.id, nextId));
+        }
+      }
+    }
+    switches && switches.forEach(s => s.pulse = Math.max(0, s.pulse - dt * 3));
+    nodes && Object.values(nodes).forEach(n => { if (n.kind === 'station' && n.pulse > 0) n.pulse = Math.max(0, n.pulse - dt * 2); });
+    flashes && flashes.forEach(f => f.t += dt); flashes = flashes && flashes.filter(f => f.t < .6);
+    if (crashAt) crashAt.t += dt;
+    if (nodes) draw();
+    requestAnimationFrame(frame);
+  }
+
+  function drawEdge(a, b, style, width) {
+    const A = P(a), B = P(b); ctx.strokeStyle = style; ctx.lineWidth = width; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
+  }
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#1b3024'; ctx.fillRect(0, 0, W, H);
+    // track bed + sleepers
+    for (const id in nodes) { const n = nodes[id]; if (!n.next) continue;
+      n.next.forEach(m => { drawEdge(id, m, '#2c4a38', 22);
+        const A = P(id), B = P(m), L = Math.hypot(B.x - A.x, B.y - A.y), ux = (B.x - A.x) / L, uy = (B.y - A.y) / L;
+        ctx.strokeStyle = '#5b4632'; ctx.lineWidth = 4;
+        for (let s = 10; s < L; s += 16) { const cx = A.x + ux * s, cy = A.y + uy * s; ctx.beginPath(); ctx.moveTo(cx - uy * 10, cy + ux * 10); ctx.lineTo(cx + uy * 10, cy - ux * 10); ctx.stroke(); }
+        drawEdge(id, m, '#8fa39a', 3); }); }
+    // switches: highlight the active branch
+    switches.forEach(s => {
+      const A = P(s.id);
+      s.next.forEach((m, i) => { const B = P(m), L = Math.hypot(B.x - A.x, B.y - A.y), k = Math.min(1, 70 / L);
+        ctx.strokeStyle = i === s.state ? '#ffffff' : 'rgba(0,0,0,.45)'; ctx.lineWidth = i === s.state ? 6 : 10; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(A.x + (B.x - A.x) * k, A.y + (B.y - A.y) * k); ctx.stroke(); });
+      const busy = occupied(s), r = 24 + s.pulse * 6;
+      ctx.fillStyle = busy ? '#ff8a8a' : '#ffffff'; ctx.beginPath(); ctx.arc(A.x, A.y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = busy ? '#b23b3b' : '#ffcc33'; ctx.lineWidth = 4; ctx.stroke();
+      // arrow towards the active branch
+      const B = P(s.next[s.state]), ang = Math.atan2(B.y - A.y, B.x - A.x);
+      ctx.save(); ctx.translate(A.x, A.y); ctx.rotate(ang); ctx.fillStyle = '#1b3024';
+      ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(-6, -10); ctx.lineTo(-2, 0); ctx.lineTo(-6, 10); ctx.closePath(); ctx.fill(); ctx.restore();
+    });
+    // stations
+    for (const id in nodes) { const n = nodes[id]; if (n.kind !== 'station') continue;
+      const p = P(id), s = 1 + Math.max(0, n.pulse) * .25, w = 56 * s, h = 36 * s;
+      ctx.fillStyle = n.colour; roundRect(p.x - w / 2, p.y - h / 2 + 8, w, h, 8); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(p.x - w / 2 - 4, p.y - h / 2 + 10); ctx.lineTo(p.x, p.y - h / 2 - 10); ctx.lineTo(p.x + w / 2 + 4, p.y - h / 2 + 10); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(p.x - 8, p.y + 6, 16, h / 2);
+      if (n.pulse < 0) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(p.x - 14, p.y - 6); ctx.lineTo(p.x + 14, p.y + 22); ctx.moveTo(p.x + 14, p.y - 6); ctx.lineTo(p.x - 14, p.y + 22); ctx.stroke(); }
+    }
+    flashes.forEach(f => { ctx.strokeStyle = `rgba(255,255,255,${1 - f.t / .6})`; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(f.x, f.y + 8, 30 + f.t * 90, 0, Math.PI * 2); ctx.stroke(); });
+    // trains
+    trains.forEach(t => {
+      for (let c = CAR_COUNT - 1; c >= 0; c--) {
+        const p = pointAt(t, t.d - c * CAR_SPACING);
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.ang);
+        if (crashAt) ctx.rotate(Math.sin(crashAt.t * 30 + c) * .3);
+        ctx.fillStyle = t.colour; roundRect(-10, -9, 20, 18, 4); ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 2; ctx.stroke();
+        if (c === 0) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(6, 0, 3.5, 0, Math.PI * 2); ctx.fill(); }
+        ctx.restore();
+      }
+    });
+    if (crashAt) { const k = Math.min(1, crashAt.t * 3); ctx.fillStyle = `rgba(255,140,40,${1 - k * .6})`;
+      ctx.beginPath(); ctx.arc(crashAt.x, crashAt.y, 20 + k * 50, 0, Math.PI * 2); ctx.fill(); }
+  }
+  function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+
+  // ---------- input ----------
+  $('stage').addEventListener('pointerdown', e => {
+    e.preventDefault(); if (phase !== 'play') return;
+    const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    let best = null, bd = TAP_RADIUS;
+    switches.forEach(s => { const p = P(s.id), d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; best = s; } });
+    if (best) flip(best);
+  });
+  $('startBtn').addEventListener('click', () => start(1));
+  $('nextBtn').addEventListener('click', () => start(level + 1));
+  $('retryBtn').addEventListener('click', () => start(level));
+  $('restartBtn').addEventListener('click', () => start(1));
+
+  // test hook (read-only peek for the automated smoke test)
+  window.__trains = { get phase() { return phase; }, get level() { return level; },
+    snapshot() {
+      const stage = cv.getBoundingClientRect();
+      return { switches: switches.map(s => ({ id: s.id, state: s.state, busy: occupied(s), x: stage.left + P(s.id).x, y: stage.top + P(s.id).y })),
+        trains: trains.map(t => ({ colour: t.colour, at: t.route[t.route.length - 1], d: t.cum[t.cum.length - 1] - t.d })),
+        // which branch each switch must point to for each colour
+        routes: Object.fromEntries(switches.map(s => [s.id, Object.fromEntries(COLOURS.map(c => {
+          const reaches = (id) => { const n = nodes[id]; return n.kind === 'station' ? n.colour === c : n.next.some(reaches); };
+          return [c, s.next.findIndex(reaches)]; }))])) };
+    } };
+
+  buildLevel(); updatePill(); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
