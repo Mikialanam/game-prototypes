@@ -10,6 +10,7 @@ Tiny mobile game prototypes. Each one is a single self-contained HTML file: open
 | Tower Drop | Tap-to-stack, perfect-drop combos | [games/tower-drop/tower-drop.html](games/tower-drop/tower-drop.html) | [README](games/tower-drop/README.md) |
 | Train Switcher | Routing puzzle, levels | [games/train-switcher/train-switcher.html](games/train-switcher/train-switcher.html) | [README](games/train-switcher/README.md) |
 | Merge a City | Merge puzzle, tallest building | [games/merge-city/merge-city.html](games/merge-city/merge-city.html) | [README](games/merge-city/README.md) |
+| Property Tycoon | Idle game, earnings while away | [games/property-tycoon/property-tycoon.html](games/property-tycoon/property-tycoon.html) | [README](games/property-tycoon/README.md) |
 | Glow Grid | Daily puzzle, streak | [games/glow-grid/glow-grid.html](games/glow-grid/glow-grid.html) | [README](games/glow-grid/README.md) |
 | Pulse | One-tap reflex, high score | [games/pulse/pulse.html](games/pulse/pulse.html) | [README](games/pulse/README.md) |
 | Math Sprint 60 | 60-second math sprint | [games/math-sprint/math-sprint.html](games/math-sprint/math-sprint.html) | [README](games/math-sprint/README.md) |

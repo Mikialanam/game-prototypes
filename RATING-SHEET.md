@@ -7,6 +7,11 @@ Play each game for about 5 minutes on your phone, ideally first thing, before re
 | Glow Grid (daily puzzle) | | | | | | | |
 | Pulse (one-tap reflex) | | | | | | | |
 | Math Sprint 60 | | | | | | | |
+| Math Ring (brain workout + ring save) | | | | | | | |
+| Tower Drop | | | | | | | |
+| Train Switcher | | | | | | | |
+| Merge a City | | | | | | | |
+| Property Tycoon (idle) | | | | | | | |
 
 **What the columns mean**
 - **Fun:** did you enjoy it while playing?

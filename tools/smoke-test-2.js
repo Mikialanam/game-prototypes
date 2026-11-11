@@ -216,6 +216,42 @@ const want = n => !only.length || only.includes(n);
     await ctx.close();
   }
 
+  // ---------- Property Tycoon ----------
+  if (want('property-tycoon')) {
+    const { page, errs, ctx } = await open('property-tycoon/property-tycoon.html');
+    const G = expr => page.evaluate(expr);
+    await page.screenshot({ path: SHOT + 'pt-start.png' });
+    await page.click('#startBtn');
+    await page.screenshot({ path: SHOT + 'pt-first.png' });
+    await page.locator('.prop').nth(0).locator('button').click();
+    const afterBuy = await G('__tycoon.money');
+    await page.waitForTimeout(4300);
+    const afterRent = await G('__tycoon.money');
+    // give the save some coins to try buying and upgrading
+    await G('__tycoon.give(5000)');
+    await page.reload(); await page.waitForTimeout(300);
+    const moneyAfterReload = Math.round(await G('__tycoon.money'));
+    const modalOnQuickReload = await page.isVisible('#awayOv.show');
+    for (let k = 0; k < 3; k++) await page.locator('.prop').nth(0).locator('button').click();
+    await page.locator('.prop').nth(1).locator('button').click();
+    await page.locator('.prop').nth(1).locator('button').click();
+    await page.waitForTimeout(1700);
+    await page.screenshot({ path: SHOT + 'pt-play.png' });
+    const levels = await G('__tycoon.levels'); const rate = await G('__tycoon.perSec');
+    // pretend the player left two hours ago
+    await G('__tycoon.leave(7200)');
+    await page.reload();
+    await page.waitForSelector('#awayOv.show', { timeout: 3000 });
+    await page.screenshot({ path: SHOT + 'pt-away.png' });
+    const before = await G('__tycoon.money');
+    const awayText = await page.textContent('#awayTime'), awayAmt = await page.textContent('#awayAmt');
+    await page.click('#collectBtn');
+    const after = await G('__tycoon.money');
+    results.propertyTycoon = { moneyAfterFirstBuy: afterBuy, moneyAfter4s: afterRent, moneyAfterReload, modalOnQuickReload, levels, perSec: rate,
+      awayText, awayAmt, collected: Math.round(after - before), expected: Math.round(rate * 7200), errs };
+    await ctx.close();
+  }
+
   console.log(JSON.stringify(results, null, 2));
   await browser.close();
 })().catch(e => { console.error(e); process.exit(1); });
