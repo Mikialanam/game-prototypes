@@ -176,6 +176,46 @@ const want = n => !only.length || only.includes(n);
     await ctx.close();
   }
 
+  // ---------- Merge a City ----------
+  if (want('merge-city')) {
+    const { page, errs, ctx } = await open('merge-city/merge-city.html');
+    const G = expr => page.evaluate(expr);
+    await page.screenshot({ path: SHOT + 'mc-start.png' });
+    await page.click('#startBtn');
+    const dragCells = async (a, b) => {
+      const A = await G(`__city.centre(${a})`), B = await G(`__city.centre(${b})`);
+      await page.mouse.move(A.x, A.y); await page.mouse.down();
+      await page.mouse.move(B.x, B.y, { steps: 6 }); await page.mouse.up();
+    };
+    let merges = 0, maxLv = 0, tapMerge = false, shot = false;
+    const t0 = Date.now();
+    while (Date.now() - t0 < 40000 && maxLv < 3) {
+      const g = await G('__city.grid');
+      let done = false;
+      for (let lv = 3; lv >= 0 && !done; lv--) {
+        const idx = g.map((v, i) => v === lv ? i : -1).filter(i => i >= 0);
+        if (idx.length >= 2) {
+          if (!tapMerge && lv === 0) { // tap-tap merge once
+            const A = await G(`__city.centre(${idx[0]})`), B = await G(`__city.centre(${idx[1]})`);
+            await page.mouse.click(A.x, A.y); await page.mouse.click(B.x, B.y); tapMerge = true;
+          } else await dragCells(idx[0], idx[1]);
+          merges++; done = true;
+        }
+      }
+      maxLv = Math.max(maxLv, ...(await G('__city.grid')).filter(v => v != null));
+      if (maxLv >= 2 && !shot) { await page.waitForTimeout(200); await page.screenshot({ path: SHOT + 'mc-play.png' }); shot = true; }
+      if (!done) await page.waitForTimeout(200);
+    }
+    const score = await page.textContent('#score');
+    // stop playing: the city fills up and the round ends
+    await page.waitForSelector('#overOv.show', { timeout: 60000 });
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: SHOT + 'mc-over.png' });
+    results.mergeCity = { merges, maxLevel: maxLv, scoreWhilePlaying: score, final: await page.textContent('#oScore'),
+      newBest: await page.textContent('#oNew'), tallest: await page.textContent('#oTall'), errs };
+    await ctx.close();
+  }
+
   console.log(JSON.stringify(results, null, 2));
   await browser.close();
 })().catch(e => { console.error(e); process.exit(1); });
