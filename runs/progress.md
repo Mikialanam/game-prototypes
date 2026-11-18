@@ -42,7 +42,7 @@ Working branch: `claude/awesome-sagan-qgefe9`, kept rebased on the GitHub Pages 
 ## Handover
 **Done:** Math Ring faster ramp, Train Switcher big arrows + themes, City Builder spec and v1, all smoke-tested on emulated phones and pushed to `claude/awesome-sagan-qgefe9`.
 
-**Blocked:** none. Not yet on the GitHub Pages branch `claude/intelligent-lamport-sbfavc`: this run only pushes to its own branch. The branch is a clean fast-forward of the Pages branch, so publishing is one fast-forward merge once Miki says go.
+**Blocked:** none. Published: Miki said "publish", so the Pages branch `claude/intelligent-lamport-sbfavc` was fast-forwarded to this work (78ebdea). All three games load on https://mikialanam.github.io/game-prototypes/.
 
 **Left / next run:**
 - Play-test City Builder numbers (all are paper estimates): houses every 3s may fill the map too fast for a casual player; pile labels on every house make the map busy.
