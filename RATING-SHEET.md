@@ -48,6 +48,14 @@ Play each game for about 5 minutes on your phone, ideally first thing, before re
 | Would you pay for credits, or watch an ad, in any of them? Where? | | |
 | Which role should come next (protester leader, police chief, campaign funder)? | | |
 
+**Train Switcher controls playtest (same child who couldn't work out the arrows).** Switch mode in ⚙️ Settings on the start card, or pause with the top-left button and tap ⚙️. Before each mode, tap "Show the first-time hint again".
+
+| Mode | Got it in the first minute without help? (Y/N) | Seconds to first correct switch | Liked it? (1–5) | Notes |
+|---|---|---|---|---|
+| 👆 Tap the rail (default) | | | | |
+| 🕹️ Lever | | | | |
+| ➡️ Arrow (original) | | | | |
+
 **Re-rate after this run's changes:** Train Switcher (bigger arrows, themes: did a child manage it?) and Math Ring (does it get hard fast enough?).
 
 **Pick:** ______________________  **Why:** ______________________________________

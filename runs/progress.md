@@ -16,7 +16,7 @@ Stay on scope: only Train Switcher controls this run.
 | 4 | Lever mode: chunky lever beside each switch, placed clear of track and stations, tap or drag to flip, link rod to the points | 30 min | done |
 | 5 | First-time hints (pulsing hand + one-line caption) on level 1, per mode; first vehicle waits a moment | 20 min | done |
 | 6 | Smoke test `tools/smoke-train-controls.js` (all modes, phones, hints, saving); keep existing tests passing; check screenshots | 30 min | done |
-| 7 | README, home page text, RATING-SHEET / RUN-LOG note; final report | 15 min | |
+| 7 | README, home page text, RATING-SHEET / RUN-LOG note; final report | 15 min | done |
 
 ## Later (not this run)
 - Playtest the three modes with the same child and note which one he gets in the first minute.
@@ -29,6 +29,16 @@ Stay on scope: only Train Switcher controls this run.
 - 21:58 Lever mode done: each lever is placed automatically in the clearest spot beside its switch (checked on iPhone SE, iPhone 13, 360x640 for 2-, 3- and 4-station levels: no overlaps); it leans the way the track goes, lamps on the base light that side, a dashed rod joins it to its switch. Tap flips; sliding 14px towards the other side flips; sliding the way it already leans does nothing. Next: first-time hints.
 - 22:12 First-time hints done: on level 1 a pulsing 👆 shows the move (on the branch to tap, sliding the lever with a curved arrow, or on the arrow button) plus a one-line caption; the first vehicle waits 2.2s and the first switch starts the wrong way for it, so the hinted move is the right one. Once a switch moves, that mode's hint is saved as seen (`hints` in the save). Settings has "Show the first-time hint again" for the next child. Next: smoke test.
 - 22:45 New `tools/smoke-train-controls.js`: 83/83 pass, twice (Settings on 3 phones, gear on start and pause cards, saved mode, mid-level change; 54 rail taps per phone along and beside every branch; levers clear on every level shape and phone, tap/slide rules; visible movement in all modes; hints per mode; bot wins levels 1–2 with each mode's own taps on iPhone SE and 360x640). `smoke-train-switcher.js` 72/72 (its tap-zone checks now pin Arrow mode). Old `smoke-test-2.js train-switcher` bot: rail 3/4 runs win all 4 levels, arrow 2/3 (the level-4 misroute is the known flaky polling bot, same in both modes). Lever hint arrow redrawn after the screenshot check. Next: README, home page, rating sheet.
+- 22:55 README (new "Switch controls" section and constants), home page line, RATING-SHEET.md playtest table per mode, RUN-LOG.md row. Pushed to the Pages branch.
+
+## Handover (Train Switcher controls run)
+**Done:** Settings screen (⚙️ on the start card and the pause card) with Switch controls: Tap the rail (default), Lever, Arrow (original, unchanged). All modes: switch visibly swings (0.3s), set branch glows, first-time hint on level 1 per mode, choice saved. Tests: `smoke-train-controls.js` 83/83, `smoke-train-switcher.js` 72/72. All on the Pages branch `claude/intelligent-lamport-sbfavc` (session branch `claude/admiring-ramanujan-f60m4i` matches).
+
+**Blocked:** none.
+
+**Choices Miki may want to change (constants at the top of the script):** rail tap band 56px each side (`RAIL_TAP_WIDTH`); levers slide-to-flip after 14px (`LEVER_DRAG`); hint shown until the first switch move, then remembered per mode (reset in Settings); first vehicle waits 2.2s on level 1 while the hint shows (`HINT_WAIT`); in Lever mode taps on the track do nothing (kept pure for testing).
+
+**Next (later):** the playtest with the same child (table in RATING-SHEET.md); old `smoke-test-2.js` Train Switcher bot is still flaky at level 4 in every mode.
 
 ---
 
