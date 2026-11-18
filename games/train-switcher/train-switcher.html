@@ -792,10 +792,10 @@ const SOUND_ON               = true;
   }
   // lever mode: a chunky lever that leans the way the track goes, joined to its switch by a rod; lamps on the base show the side
   const leftIdx = s => P(s.next[0]).x <= P(s.next[1]).x ? 0 : 1;
+  const leverTilt = s => { const side = i => (i === leftIdx(s) ? -1 : 1) * LEVER_TILT * Math.PI / 180; return side(0) + (side(1) - side(0)) * ease(s.anim); };
   function drawLever(s) {
     const busy = occupied(s), k = leverR() / 30, sh = s.shake > 0 ? Math.sin(s.shake * 38) * 5 * s.shake : 0, x = s.lv.x + sh, y = s.lv.y, A = P(s.id);
-    const side = i => (i === leftIdx(s) ? -1 : 1) * LEVER_TILT * Math.PI / 180;
-    const tilt = side(0) + (side(1) - side(0)) * ease(s.anim) + (s.drag || 0);
+    const tilt = leverTilt(s) + (s.drag || 0);
     ctx.lineCap = 'round'; ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 7; line(A.x, A.y, x, y + 4 * k);           // the rod to the switch
     ctx.strokeStyle = busy ? 'rgba(255,93,93,.8)' : 'rgba(255,255,255,.75)'; ctx.lineWidth = 3; ctx.setLineDash([6, 5]); line(A.x, A.y, x, y + 4 * k); ctx.setLineDash([]);
     if (s.pulse > 0) { ctx.strokeStyle = `rgba(255,255,255,${s.pulse * .9})`; ctx.lineWidth = 5; circle(x, y - 14 * k, 30 * k + (1 - s.pulse) * 26); ctx.stroke(); }
@@ -837,8 +837,11 @@ const SOUND_ON               = true;
     const press = k < .5 ? Math.sin(k / .5 * Math.PI) : 0, slide = h.slide ? Math.min(1, k / .6) * 30 * h.slide : 0;
     if (!h.slide) { ctx.strokeStyle = `rgba(255,255,255,${(1 - k) * .9})`; ctx.lineWidth = 4; circle(h.x, h.y, 10 + k * 34); ctx.stroke(); }
     else { ctx.globalAlpha = .9; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 5; ctx.lineCap = 'round';      // a curved "push this way" arrow
-      const ax = h.x + h.slide * 44, ay = h.y - 8; ctx.beginPath(); ctx.arc(h.x, h.y + 26, 46, -Math.PI / 2 - .5, -Math.PI / 2 + .5); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(ax - h.slide * 4, ay - 11); ctx.lineTo(ax + h.slide * 6, ay + 3); ctx.lineTo(ax - h.slide * 12, ay + 6); ctx.stroke(); ctx.globalAlpha = 1; }
+      const cx = h.x, cy = h.y + 30, R = 50, end = .6, tx = Math.cos(end) * h.slide, ty = Math.sin(end);                 // arc over the knob, head at the far end
+      const ex = cx + Math.sin(end) * R * h.slide, ey = cy - Math.cos(end) * R;
+      ctx.beginPath(); ctx.arc(cx, cy, R, -Math.PI / 2 - end, -Math.PI / 2 + end); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ex - tx * 11 - ty * 9 * h.slide, ey - ty * 11 + tx * 9 * h.slide); ctx.lineTo(ex + tx * 3, ey + ty * 3);
+      ctx.lineTo(ex - tx * 11 + ty * 9 * h.slide, ey - ty * 11 - tx * 9 * h.slide); ctx.stroke(); ctx.globalAlpha = 1; }
     ctx.save(); ctx.translate(h.x + slide, h.y + 4 + press * 6); ctx.scale(1 - press * .12, 1 - press * .12);
     ctx.font = '46px system-ui, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 8; ctx.fillText('👆', 0, -4); ctx.restore();
@@ -905,7 +908,7 @@ const SOUND_ON               = true;
     switches.forEach(s => s.next.forEach((m, i) => {
       const A = P(s.id), B = P(m), len = Math.hypot(B.x - A.x, B.y - A.y) || 1, ux = (B.x - A.x) / len, uy = (B.y - A.y) / len;
       const a = (x - A.x) * ux + (y - A.y) * uy, d = Math.abs((x - A.x) * uy - (y - A.y) * ux);
-      const end = nodes[m].kind === 'switch' ? len - HUB_TAP_R : len + 36;
+      const end = nodes[m].kind === 'switch' ? len - 22 : len + 36;   // stop just short of the next switch; run on past a station
       if (a >= 12 && a <= end && d <= bd) { bd = d; best = { s, i }; }
     }));
     if (best) return best;
@@ -965,6 +968,7 @@ const SOUND_ON               = true;
     get theme() { return themeName; }, setTheme(name) { return setTheme(name); },
     get difficulty() { return diffName; }, setDifficulty(name) { return setDifficulty(name); }, get crash() { return D.crash; }, get speed() { return speedName; }, setSpeed(name) { return setSpeed(name); }, cfg(n) { return levelCfg(n); },
     get hint() { const h = hintSpot(); return { on: hintOn, spot: h && { x: cv.getBoundingClientRect().left + h.x, y: cv.getBoundingClientRect().top + h.y, slide: h.slide }, caption: $('hint').classList.contains('show') ? $('hint').textContent : '' }; },
+    _switch(id) { return nodes[id]; },   // tests only: set a switch's starting position
     get controls() { return ctrlName; }, setControls(name) { return setControls(name); },
     get paused() { return paused; }, start(n) { start(Math.max(1, n | 0)); },
     layout() {   // sizes the layout test checks: switch buttons, tap reach and the boxes the stations fill
@@ -975,7 +979,7 @@ const SOUND_ON               = true;
     snapshot() {
       const stage = cv.getBoundingClientRect();
       return { switches: switches.map(s => ({ id: s.id, state: s.state, busy: occupied(s), x: stage.left + P(s.id).x, y: stage.top + P(s.id).y, anim: s.anim,
-          lever: s.lv && { x: stage.left + s.lv.x, y: stage.top + s.lv.y - leverR() * .5, r: leverR(), clear: s.lv.clear, side: Math.sign((s.state === leftIdx(s) ? -1 : 1)) },
+          lever: s.lv && { x: stage.left + s.lv.x, y: stage.top + s.lv.y - leverR() * .5, r: leverR(), clear: s.lv.clear, lean: Math.sign(leverTilt(s)) },
           // rail mode: where each branch's track is (switch and far end, page px), for tests that tap along it
           branches: s.next.map(m => ({ to: m, ax: stage.left + P(s.id).x, ay: stage.top + P(s.id).y, bx: stage.left + P(m).x, by: stage.top + P(m).y })) })),
         trains: trains.map(t => ({ colour: t.colour, at: t.route[t.route.length - 1], d: t.cum[t.cum.length - 1] - t.d })),

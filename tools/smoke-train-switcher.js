@@ -1,4 +1,5 @@
 // Plays Train Switcher in all three themes on emulated phones and checks the big switch buttons, the tap zone and the theme picker.
+// The bots tap the centre of each switch, which works in every control mode; the switch-control modes have their own test, smoke-train-controls.js.
 // Run: node tools/smoke-train-switcher.js   (needs Playwright + Chromium). Prints a JSON summary; exits non-zero if a check fails
 // or the page logs an error. Screenshots land in $SHOT_DIR, or in <temp dir>/train-switcher-shots.
 const { chromium, devices } = require('playwright');
@@ -156,6 +157,7 @@ const PHONES = {
   // ---------- 3. tap zone, busy switch, pause: on the 360x640 screen ----------
   async function tapZone() {
     const { page, ctx } = await open('360x640');
+    await page.evaluate(() => __trains.setControls && __trains.setControls('arrow'));   // the tap-zone rules below are the Arrow controls
     const out = summary.tapZone, state = async id => (await snap(page)).switches.find(w => w.id === id).state;
     out.tapRadiusConstant = await page.evaluate(() => TAP_RADIUS);
     // a tap 55px from the centre, on any side, still flips the switch
