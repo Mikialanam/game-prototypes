@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#17140f">
+<title>Contract Hustle</title>
+<style>
+  :root { --bg: #17140f; --panel: #26211a; --panel2: #332c22; --text: #fff8ec; --muted: #b8aa92; --accent: #ffb020;
+    --good: #4fd18b; --bad: #ff6b6b; --warn: #ffb347; --blue: #5ab0ff; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; user-select: none; -webkit-user-select: none; }
+  body { display: flex; flex-direction: column; height: 100dvh; max-width: 480px; margin: 0 auto; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); gap: 8px; }
+  header { display: flex; align-items: center; gap: 8px; }
+  header h1 { font-size: 17px; margin: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pill { background: var(--panel); border-radius: 999px; padding: 6px 10px; font-size: 14px; font-weight: 700; white-space: nowrap; }
+  #stats { background: var(--panel); border-radius: 14px; padding: 8px 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+  #stats .wide { grid-column: 1 / 3; }
+  .lbl { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+  .lbl b { color: var(--text); }
+  .bar { position: relative; height: 10px; border-radius: 5px; background: #0d0b08; overflow: hidden; }
+  .bar.tall { height: 14px; border-radius: 7px; }
+  .bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; transition: width .4s, background .4s; }
+  .bar .line { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff6; }
+  #mayor { display: flex; gap: 8px; align-items: center; background: var(--panel); border-radius: 14px; padding: 6px 10px; font-size: 13px; line-height: 1.3; }
+  #mayor .face { font-size: 26px; }
+  #mayor b { display: block; font-size: 13px; }
+  #main { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+  h3.step { margin: 2px 0 0; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .moves { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  button { font: inherit; color: inherit; border: 0; cursor: pointer; }
+  .move { background: var(--panel2); border-radius: 14px; padding: 10px; text-align: left; min-height: 92px; }
+  .move b { font-size: 15px; display: block; } .move span { display: block; font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.3; }
+  .move .c { color: var(--accent); font-weight: 800; }
+  .move:disabled { opacity: .4; }
+  .move:active, .bid:active { transform: translateY(2px); }
+  .contract { background: var(--panel2); border-radius: 16px; padding: 8px 10px; }
+  .contract .top { display: flex; gap: 10px; align-items: center; }
+  .contract .ic { font-size: 32px; }
+  .contract h4 { margin: 0; font-size: 16px; }
+  .contract .facts { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+  .up { color: var(--good); font-weight: 700; } .dn { color: var(--bad); font-weight: 700; }
+  .bids { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
+  .bid { min-height: 58px; border-radius: 12px; font-weight: 800; font-size: 15px; line-height: 1.15; padding: 4px; }
+  .bid small { display: block; font-size: 11px; font-weight: 600; opacity: .85; margin-top: 2px; }
+  .bid.low { background: #ff8a5c; color: #2b0d00; } .bid.fair { background: var(--accent); color: #2b1c00; } .bid.high { background: #b48cff; color: #1a0b35; }
+  .bid:disabled { opacity: .35; }
+  .pass { min-height: 54px; border-radius: 14px; background: var(--panel); font-weight: 700; font-size: 15px; }
+  .frozen { background: #3a1f1f; border: 2px solid var(--bad); border-radius: 16px; padding: 14px; text-align: center; font-size: 15px; line-height: 1.4; }
+  #tools { display: grid; grid-template-columns: 1fr 52px; gap: 8px; }
+  .tool { min-height: 48px; border-radius: 12px; background: var(--panel); font-size: 15px; font-weight: 700; }
+  .overlay { position: fixed; inset: 0; background: rgba(10,8,5,.9); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+  .overlay.show { display: flex; }
+  .sheet { background: var(--panel); border-radius: 20px; padding: 20px 16px; width: 100%; max-width: 420px; max-height: 100%; overflow-y: auto; text-align: center; }
+  .sheet h2 { margin: 0 0 6px; font-size: 24px; }
+  .sheet p { margin: 6px 0; font-size: 15px; line-height: 1.4; color: var(--muted); }
+  .sheet .btn { width: 100%; min-height: 58px; border-radius: 14px; font-size: 18px; font-weight: 800; margin-top: 10px; background: var(--accent); color: #2b1c00; }
+  .sheet .btn.alt { background: var(--panel2); color: var(--text); }
+  .crisisBox { background: #3a2a1a; border-radius: 12px; padding: 10px; margin: 10px 0; text-align: left; font-size: 14px; }
+  table.reveal { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 15px; }
+  table.reveal td { padding: 8px 6px; border-bottom: 1px solid #fff1; text-align: left; }
+  table.reveal td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  table.reveal tr.win td { color: var(--good); font-weight: 800; }
+  .news { text-align: left; background: #f3ecd9; color: #1d1a12; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-family: Georgia, serif; }
+  .news b { display: block; font-size: 16px; } .news span { font-size: 13px; font-style: italic; } .news em { display: block; font-style: normal; font-family: system-ui, sans-serif; font-weight: 800; font-size: 13px; margin-top: 4px; }
+  .bigscore { font-size: 56px; font-weight: 900; margin: 4px 0; line-height: 1; }
+  .newbest { color: var(--accent); font-weight: 800; min-height: 22px; }
+  .fine { font-size: 12px !important; }
+  #toast { position: fixed; left: 50%; top: 8px; transform: translateX(-50%); background: #000d; padding: 8px 14px; border-radius: 12px; font-size: 14px; font-weight: 700; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 5; max-width: 90%; text-align: center; }
+  #toast.on { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏗️ Contract Hustle</h1>
+  <div class="pill" id="roundPill">Round 1/10</div>
+  <div class="pill" id="cashPill">🪙 0</div>
+</header>
+<div id="stats">
+  <div class="wide"><div class="lbl"><span>Public Opinion of your firm</span><b id="opNum">50</b></div><div class="bar tall"><i id="opBar"></i><div class="line" style="left:35%"></div><div class="line" style="left:20%"></div></div></div>
+  <div><div class="lbl"><span>⭐ Reputation</span><b id="repNum">0</b></div><div class="bar"><i id="repBar" style="background:var(--blue)"></i></div></div>
+  <div><div class="lbl"><span>🤝 Connections</span><b id="connNum">0</b></div><div class="bar"><i id="connBar" style="background:#b48cff"></i></div></div>
+</div>
+<div id="mayor"><div class="face" id="mFace">🙂</div><div><b id="mName">Mayor Dale Fenwick</b><span id="mLine"></span></div></div>
+<div id="main"></div>
+<div id="tools">
+  <button class="tool" id="creditsBtn">🪙 Get credits</button>
+  <button class="tool" id="helpBtn" aria-label="Help">?</button>
+</div>
+
+<div class="overlay show" id="startOv"><div class="sheet">
+  <div style="font-size:48px">🏗️</div>
+  <h2>Contract Hustle</h2>
+  <p>You run <b>Halden Build Co.</b>, a construction firm in Port Halden. Ten rounds of city contracts. Win them on price, reputation and who you know.</p>
+  <p>The mayor watches the polls. If the public turns on you, the contracts dry up.</p>
+  <div class="crisisBox"><b>📰 Today in Port Halden:</b> <span id="todayCrisis"></span><br><span class="fine" style="color:var(--muted)" id="todayEffect"></span></div>
+  <button class="btn" id="startBtn">Open for business</button>
+  <p class="fine" id="bestLine"></p>
+</div></div>
+
+<div class="overlay" id="resultOv"><div class="sheet">
+  <h2 id="rTitle">Bids are in</h2>
+  <p id="rSub"></p>
+  <table class="reveal" id="rTable"></table>
+  <p id="rLine"></p>
+  <div id="rNews"></div>
+  <button class="btn" id="rOk">Next round</button>
+</div></div>
+
+<div class="overlay" id="credOv"><div class="sheet">
+  <h2>🪙 Credits</h2>
+  <p>Credits are your company's cash. They pay for bids, donations and projects.</p>
+  <button class="btn" id="adBtn">▶ Watch an ad: +<span id="adAmt"></span> credits</button>
+  <p class="fine">Placeholder: no real ad. Once per game.</p>
+  <button class="btn alt" id="buyBtn">🛒 Buy credits</button>
+  <p class="fine" id="buyNote">Placeholder: no real payments. Bought credits would never count toward company value, so paying can't win.</p>
+  <button class="btn alt" id="credClose">Back</button>
+</div></div>
+<div class="overlay" id="adOv"><div class="sheet"><h2>📺 Ad placeholder</h2><p>A short rewarded ad would play here.</p><p id="adCount" style="font-size:40px;color:var(--text)">3</p></div></div>
+
+<div class="overlay" id="helpOv"><div class="sheet" style="text-align:left">
+  <h2 style="text-align:center">How it works</h2>
+  <p>• Each round: make one <b>move</b> (optional), then <b>bid</b> on a contract or take small private jobs.</p>
+  <p>• The city scores every bid on <b>price</b>, <b>reputation</b> and <b>connections</b>, plus how the mayor feels about you. Two rival firms bid too.</p>
+  <p>• Winning: you pay the build cost now and get paid your bid when it's finished. <b>Lowball</b> bids win more but leave a thin margin and a risk of cutting corners (cracks, bad press).</p>
+  <p>• <b>Public Opinion</b> of your firm moves with what you build and how you play. Under 35 the mayor only lets you see one contract; under 20 you're frozen out.</p>
+  <p>• Score = company value after 10 rounds: cash + half of any unpaid work + reputation × 2 + connections.</p>
+  <button class="btn" id="helpClose">Got it</button>
+</div></div>
+
+<div class="overlay" id="endOv"><div class="sheet">
+  <div style="font-size:52px" id="endIcon">🏁</div>
+  <h2>Ten rounds done</h2>
+  <p id="endLine"></p>
+  <div class="bigscore" id="endScore">0</div>
+  <p>company value</p>
+  <p class="fine" id="endBreak"></p>
+  <div class="newbest" id="endBest"></div>
+  <button class="btn" id="againBtn">Play again</button>
+  <button class="btn alt" id="homeBtn">All games</button>
+</div></div>
+<div id="toast"></div>
+
+<script>
+// ================= TUNABLE CONSTANTS =================
+const ROUNDS            = 10;
+const START_CASH        = 120;
+const START_OPINION     = 50;
+const START_REP         = 45;
+const START_CONN        = 30;
+const DIM_OPINION       = 35;    // below this the mayor only shows you one contract
+const FROZEN_OPINION    = 20;    // below this the mayor freezes you out
+const COST_SHARE        = 0.65;  // build cost as a share of the city's budget (before today's crisis)
+const COST_WOBBLE       = 0.10;  // real cost can land ± this share off the estimate
+const BID_LEVELS        = { low: 0.78, fair: 0.90, high: 1.00 }; // bid as a share of the city's budget
+const PRICE_WEIGHT      = 1.0;   // city's scoring: points per % under budget
+const REP_WEIGHT        = 0.35;  // points per reputation
+const CONN_WEIGHT       = 0.40;  // points per connection
+const MAYOR_BIAS        = 0.25;  // points per opinion above/below 50 (the mayor likes popular firms)
+const SCORE_NOISE       = 5;     // unknown factors in the city's scoring (± points)
+const CORNER_MARGIN     = 0.18;  // if your margin is thinner than this, you might cut corners
+const CORNER_RISK       = 0.45;  // chance of cracks on a thin-margin job
+const CORNER_HIT        = { op: -8, rep: -6 };
+const PRIVATE_JOB_PAY   = 5;     // pass on city work and take small private jobs
+const AD_CREDITS        = 15;
+const REP_VALUE         = 2;     // company value per reputation point
+const CONN_VALUE        = 1;     // company value per connection point
+const SOUND_ON          = true;
+const MOVES = {
+  donate:    { icon: '🎗️', name: "Donate to the mayor's campaign", cost: 20, eff: { conn: 12, op: -3 }, note: 'Connections ▲▲, Opinion ▼ (it is public record)' },
+  community: { icon: '🛝', name: 'Fund a community playground',   cost: 20, eff: { rep: 6, op: 8 }, note: 'Good press: Opinion ▲▲, Reputation ▲' },
+  lobby:     { icon: '🥂', name: 'Lobby over a long lunch',        cost: 10, eff: { conn: 15 }, risk: 0.30, exposed: { op: -15, rep: -8, conn: -10 }, note: 'Connections ▲▲ fast. 30% risk of exposure next round' },
+};
+// =====================================================
+
+(() => {
+  const STORE = 'contracthustle.v1';
+  const $ = id => document.getElementById(id);
+  const load = () => { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch (e) { return {}; } };
+  const save = s => { try { localStorage.setItem(STORE, JSON.stringify(s)); } catch (e) {} };
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  let ac = null;
+  function beep(freq, dur = 0.08, type = 'triangle', vol = 0.12) {
+    if (!SOUND_ON) return;
+    try { ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      const o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.value = freq; g.gain.value = vol;
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + dur); o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + dur);
+    } catch (e) {}
+  }
+  const sfx = { tap: () => beep(520, .04), good: () => { beep(660); setTimeout(() => beep(990), 90); }, bad: () => beep(200, .18, 'sawtooth', .08),
+    cash: () => [880, 1175].forEach((f, i) => setTimeout(() => beep(f, .07, 'square', .05), i * 70)),
+    end: () => [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, .14), i * 120)) };
+  function hash(s) { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+  function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  const today = new Date().toISOString().slice(0, 10);
+
+  // opWin: public reaction when you win it; opDone / repDone: when it's finished without cracks
+  const CONTRACTS = [
+    { id: 'road',    icon: '🛣️', name: 'Resurface Harbour Road',   budget: 60,  rounds: 1, opWin: 1,  opDone: 3, repDone: 3, kind: 'road' },
+    { id: 'tram',    icon: '🚋', name: 'Tram line extension',       budget: 150, rounds: 3, opWin: 2,  opDone: 5, repDone: 7, kind: 'transit' },
+    { id: 'tower',   icon: '🏙️', name: 'Waterfront glass tower',    budget: 190, rounds: 3, opWin: -7, opDone: 0, repDone: 3, kind: 'tower' },
+    { id: 'school',  icon: '🏫', name: 'New school roof',           budget: 50,  rounds: 1, opWin: 2,  opDone: 4, repDone: 4, kind: 'civic' },
+    { id: 'seawall', icon: '🌊', name: 'Seawall upgrade',           budget: 110, rounds: 2, opWin: 1,  opDone: 4, repDone: 5, kind: 'civic' },
+    { id: 'stadium', icon: '🏟️', name: 'Stadium VIP boxes',         budget: 160, rounds: 2, opWin: -5, opDone: 0, repDone: 2, kind: 'tower' },
+    { id: 'housing', icon: '🏘️', name: 'Affordable housing block',  budget: 120, rounds: 2, opWin: 3,  opDone: 6, repDone: 5, kind: 'civic', costShare: 0.8 },
+    { id: 'carpark', icon: '🅿️', name: 'Luxury car park',            budget: 80,  rounds: 1, opWin: -4, opDone: 0, repDone: 1, kind: 'tower' },
+    { id: 'bridge',  icon: '🌉', name: 'Repaint the Gull Bridge',   budget: 70,  rounds: 1, opWin: 1,  opDone: 2, repDone: 3, kind: 'road' },
+    { id: 'bus',     icon: '🚌', name: 'Bus station refit',         budget: 90,  rounds: 2, opWin: 2,  opDone: 3, repDone: 4, kind: 'transit' },
+    { id: 'potholes',icon: '🕳️', name: 'Citywide pothole blitz',    budget: 55,  rounds: 1, opWin: 2,  opDone: 3, repDone: 2, kind: 'road' },
+  ];
+  const RIVALS = [
+    { name: 'Granite & Sons', icon: '🪨', rep: 55, conn: 20 },
+    { name: 'Brightline Builders', icon: '✨', rep: 30, conn: 45 },
+  ];
+  // Today's crisis: one modifier for the whole game, picked from the date
+  const CRISES = [
+    { title: 'Steel shortage', effect: 'Build costs +20% today.', mod: { cost: 1.2 } },
+    { title: 'Election season', effect: 'The mayor watches the polls twice as closely.', mod: { mayor: 2 } },
+    { title: 'Save Our Skyline campaign', effect: 'Towers, VIP boxes and car parks cost double the opinion.', mod: { towerHit: 2 } },
+    { title: 'Pothole emergency', effect: 'Road jobs pay 30% more.', mod: { roadPay: 1.3 } },
+    { title: 'Audit week at City Hall', effect: 'Lobbying is twice as likely to be exposed.', mod: { lobbyRisk: 2 } },
+    { title: 'Budget squeeze', effect: 'Every city budget is 15% smaller.', mod: { budget: 0.85 } },
+    { title: 'Community spirit week', effect: 'Community projects give 50% more opinion.', mod: { community: 1.5 } },
+    { title: 'Transit strike', effect: 'No transit contracts today.', mod: { noTransit: true } },
+  ];
+  const crisis = CRISES[Math.floor(rng(hash('hustle' + today))() * CRISES.length)];
+  const M = Object.assign({ cost: 1, mayor: 1, towerHit: 1, roadPay: 1, lobbyRisk: 1, budget: 1, community: 1, noTransit: false }, crisis.mod);
+
+  let S, store = load();
+  window.__hustle = { get S() { return S; }, M, crisis, RIVALS, odds: c => odds(c) };
+
+  function newGame() {
+    S = { round: 1, cash: START_CASH, op: START_OPINION, rep: START_REP, conn: START_CONN, phase: 'move', jobs: [], exposures: [],
+      offers: [], adUsed: false, won: 0, lost: 0, cracks: 0, done: false, news: [] };
+    rollOffers(); render();
+  }
+  function budgetOf(c) { return Math.round(c.budget * M.budget * (c.kind === 'road' ? M.roadPay : 1)); }
+  function costOf(c) { return Math.round(budgetOf(c) * (c.costShare || COST_SHARE) * M.cost / (c.kind === 'road' ? M.roadPay : 1)); }
+  function rollOffers() {
+    const pool = CONTRACTS.filter(c => !(M.noTransit && c.kind === 'transit')).sort(() => Math.random() - .5);
+    S.offers = pool.slice(0, 2);
+  }
+  const visibleOffers = () => S.op < FROZEN_OPINION ? [] : S.op < DIM_OPINION ? S.offers.slice(0, 1) : S.offers;
+  function apply(e) {
+    for (const k in e) { if (k === 'op') S.op = clamp(S.op + e[k], 0, 100); else if (k === 'rep') S.rep = clamp(S.rep + e[k], 0, 100); else if (k === 'conn') S.conn = clamp(S.conn + e[k], 0, 100); else if (k === 'cash') S.cash += e[k]; }
+  }
+  const opWinOf = c => c.opWin < 0 && c.kind === 'tower' ? Math.round(c.opWin * M.towerHit) : c.opWin;
+
+  // ---------- city scoring ----------
+  const mayorBias = () => (S.op - 50) * MAYOR_BIAS * M.mayor;
+  function scoreFor(bidShare, rep, conn, bias) { return PRICE_WEIGHT * (1 - bidShare) * 100 + REP_WEIGHT * rep + CONN_WEIGHT * conn + bias; }
+  function rivalShare() { return 0.80 + Math.random() * 0.17; }
+  function odds(level) { // estimate your chance at a bid level by simulation
+    let w = 0; const N = 300;
+    for (let i = 0; i < N; i++) {
+      const me = scoreFor(BID_LEVELS[level], S.rep, S.conn, mayorBias()) + (Math.random() * 2 - 1) * SCORE_NOISE;
+      if (RIVALS.every(r => me > scoreFor(rivalShare(), r.rep, r.conn, 0) + (Math.random() * 2 - 1) * SCORE_NOISE)) w++;
+    }
+    return w / N;
+  }
+  const oddsWord = p => `<b>${Math.round(p * 100)}%</b>`;
+
+  // ---------- render ----------
+  function mayorMood() {
+    if (S.op >= 65) return ['😄', '"Halden Build! My favourite builders. Ribbon cutting Tuesday?"'];
+    if (S.op >= DIM_OPINION + 10) return ['🙂', '"Good work gets good work. Keep it up."'];
+    if (S.op >= DIM_OPINION) return ['😐', '"I\'m hearing things about your firm. Careful."'];
+    if (S.op >= FROZEN_OPINION) return ['😬', '"I can\'t be seen with you right now. One contract, max."'];
+    return ['🙈', '"Who? Never heard of them." (You\'re frozen out of city work.)'];
+  }
+  function render() {
+    $('roundPill').textContent = `Round ${Math.min(S.round, ROUNDS)}/${ROUNDS}`;
+    $('cashPill').textContent = '🪙 ' + S.cash;
+    $('opNum').textContent = Math.round(S.op); $('opBar').style.width = S.op + '%';
+    $('opBar').style.background = S.op >= 50 ? 'var(--good)' : S.op >= DIM_OPINION ? 'var(--warn)' : 'var(--bad)';
+    $('repNum').textContent = S.rep; $('repBar').style.width = S.rep + '%';
+    $('connNum').textContent = S.conn; $('connBar').style.width = S.conn + '%';
+    const [f, l] = mayorMood(); $('mFace').textContent = f; $('mLine').textContent = l;
+    const main = $('main');
+    if (S.phase === 'move') {
+      main.innerHTML = `<h3 class="step">1 · Make a move (optional)</h3><div class="moves">` +
+        Object.entries(MOVES).map(([k, m]) => `<button class="move" data-k="${k}" ${m.cost > S.cash ? 'disabled' : ''}><b>${m.icon} ${m.name}</b><span><span class="c">${m.cost}🪙</span> · ${k === 'lobby' && M.lobbyRisk > 1 ? m.note.replace('30%', Math.round(m.risk * M.lobbyRisk * 100) + '%') : m.note}</span></button>`).join('') +
+        `<button class="move" data-k="skip"><b>⏭️ Skip</b><span>Save your credits for the bid.</span></button></div>` + jobsLine();
+      main.querySelectorAll('.move').forEach(b => b.onclick = () => doMove(b.dataset.k));
+    } else if (S.phase === 'bid') {
+      const offers = visibleOffers();
+      let h = `<h3 class="step">2 · Bid for a contract</h3>`;
+      if (!offers.length) h += `<div class="frozen">🙈 <b>Frozen out.</b><br>The mayor won't return your calls. Public Opinion is under ${FROZEN_OPINION}. Fund something nice to win them back.</div>`;
+      offers.forEach((c, i) => {
+        const cost = costOf(c), b = budgetOf(c), ow = opWinOf(c);
+        h += `<div class="contract"><div class="top"><div class="ic">${c.icon}</div><div><h4>${c.name}</h4><div class="facts">City budget <b>${b}🪙</b> · your cost ~<b>${cost}🪙</b> · ${c.rounds} round${c.rounds > 1 ? 's' : ''}<br>Public: ${ow > 0 ? `<span class="up">likes it (+${ow})</span>` : ow < 0 ? `<span class="dn">hates it (${ow})</span>` : 'shrugs'}${c.opDone ? ` · <span class="up">+${c.opDone} when done</span>` : ''}</div></div></div><div class="bids">` +
+          Object.keys(BID_LEVELS).map(l => {
+            const amt = Math.round(b * BID_LEVELS[l]), p = odds(l), can = S.cash >= cost;
+            return `<button class="bid ${l}" data-i="${i}" data-l="${l}" ${can ? '' : 'disabled'}>${l === 'low' ? 'Lowball' : l === 'fair' ? 'Fair' : 'Premium'} ${amt}<small>${can ? 'odds ' + oddsWord(p) + ' · +' + (amt - cost) : 'need ' + cost + '🪙'}</small></button>`;
+          }).join('') + `</div></div>`;
+      });
+      h += `<button class="pass" id="passBtn">🔧 Pass: small private jobs (+${PRIVATE_JOB_PAY}🪙)</button>` + jobsLine();
+      main.innerHTML = h;
+      main.querySelectorAll('.bid').forEach(b => b.onclick = () => doBid(offers[+b.dataset.i], b.dataset.l));
+      $('passBtn').onclick = () => doPass();
+    } else main.innerHTML = '';
+  }
+  function jobsLine() {
+    if (!S.jobs.length) return '';
+    return `<p class="fine" style="color:var(--muted);margin:2px 4px">🚧 Building: ${S.jobs.map(j => `${j.c.icon} ${j.c.name} (paid ${j.bid}🪙 in ${j.due - S.round} round${j.due - S.round === 1 ? '' : 's'})`).join(', ')}</p>`;
+  }
+
+  // ---------- actions ----------
+  function doMove(k) {
+    sfx.tap();
+    if (k !== 'skip') {
+      const m = MOVES[k]; S.cash -= m.cost;
+      const e = { ...m.eff }; if (k === 'community') e.op = Math.round(e.op * M.community);
+      apply(e);
+      if (k === 'lobby' && Math.random() < m.risk * M.lobbyRisk) S.exposures.push(S.round + 1);
+      toast(`${m.icon} ${k === 'donate' ? 'Donation logged.' : k === 'community' ? 'Ribbon cut! Kids cheer.' : 'Lunch was long. Wine was expensive.'}`);
+    }
+    S.phase = 'bid'; render();
+  }
+  function doBid(c, level) {
+    const b = budgetOf(c), bid = Math.round(b * BID_LEVELS[level]);
+    const mine = scoreFor(BID_LEVELS[level], S.rep, S.conn, mayorBias()) + (Math.random() * 2 - 1) * SCORE_NOISE;
+    const rows = [{ name: 'Halden Build Co. (you)', bid, score: mine, me: true }];
+    RIVALS.forEach(r => { const sh = rivalShare(); rows.push({ name: r.icon + ' ' + r.name, bid: Math.round(b * sh), score: scoreFor(sh, r.rep, r.conn, 0) + (Math.random() * 2 - 1) * SCORE_NOISE }); });
+    rows.sort((a, z) => z.score - a.score);
+    const win = rows[0].me;
+    let line;
+    if (win) {
+      const est = costOf(c), real = Math.round(est * (1 + (Math.random() * 2 - 1) * COST_WOBBLE));
+      S.cash -= real; S.won++;
+      const thin = (bid - real) / bid < CORNER_MARGIN;
+      S.jobs.push({ c, bid, due: S.round + c.rounds, cracks: thin && Math.random() < CORNER_RISK });
+      apply({ op: opWinOf(c) });
+      line = `You won! Build cost ${real}🪙 paid now; the city pays you ${bid}🪙 in ${c.rounds} round${c.rounds > 1 ? 's' : ''}.${thin ? ' <b style="color:var(--warn)">Thin margin: the crew may cut corners.</b>' : ''}`;
+      sfx.good();
+    } else { S.lost++; line = `${rows[0].name.replace(/^\S+ /, '')} got it. ${rows[0].bid < bid ? 'They were cheaper.' : 'They had better friends or a better name.'}`; sfx.bad(); }
+    showResult(`${c.icon} ${c.name}`, rows, line, win);
+  }
+  function doPass() { S.cash += PRIVATE_JOB_PAY; sfx.cash(); showResult('Private jobs', null, `Kitchens, sheds and one very fancy dog house: +${PRIVATE_JOB_PAY}🪙.`, false); }
+
+  function showResult(title, rows, line, win) {
+    S.phase = 'result'; render();
+    $('rTitle').textContent = rows ? (win ? '🎉 Contract won' : 'Contract lost') : '🔧 Quiet round';
+    $('rSub').textContent = title;
+    $('rTable').innerHTML = rows ? `<tr><td><b>Firm</b></td><td class="n"><b>Bid</b></td><td class="n"><b>City score</b></td></tr>` + rows.map((r, i) => `<tr class="${i === 0 ? 'win' : ''}"><td>${i === 0 ? '🏆 ' : ''}${r.name}</td><td class="n">${r.bid}</td><td class="n">${Math.round(r.score)}</td></tr>`).join('') : '';
+    $('rLine').innerHTML = line;
+    // end of round: jobs finishing, exposures, then next round's news
+    const news = [];
+    S.round++;
+    S.jobs = S.jobs.filter(j => {
+      if (j.due > S.round) return true;
+      if (j.cracks) { apply(CORNER_HIT); S.cash += j.bid; S.cracks++; news.push({ h: `CRACKS FOUND IN ${j.c.name.toUpperCase()}`, s: 'Inspectors blame "creative" concrete. Halden Build is paid, but nobody is happy.', e: `Paid ${j.bid}🪙 · Opinion ${CORNER_HIT.op} · Reputation ${CORNER_HIT.rep}`, bad: true }); }
+      else { apply({ op: j.c.opDone, rep: j.c.repDone }); S.cash += j.bid; news.push({ h: `${j.c.name.toUpperCase()} OPENS ON TIME`, s: 'The mayor cuts the ribbon. Somebody brings cake.', e: `Paid ${j.bid}🪙${j.c.opDone ? ' · Opinion +' + j.c.opDone : ''} · Reputation +${j.c.repDone}` }); }
+      return false;
+    });
+    S.exposures = S.exposures.filter(r => { if (r <= S.round) { apply(MOVES.lobby.exposed); news.push({ h: 'BUILDER\'S BOOZY LUNCH WITH OFFICIALS LEAKED', s: 'The receipt included a 400-credit bottle and "dessert for the committee".', e: 'Opinion −15 · Reputation −8 · Connections −10', bad: true }); return false; } return true; });
+    if (S.op < FROZEN_OPINION) news.push({ h: 'MAYOR CUTS TIES WITH HALDEN BUILD', s: '"We are reviewing all contracts," says City Hall.', e: 'No city contracts until opinion recovers', bad: true });
+    $('rNews').innerHTML = news.map(n => `<div class="news"><b>${n.h}</b><span>${n.s}</span><em style="color:${n.bad ? '#b3261e' : '#1d6b3a'}">${n.e}</em></div>`).join('');
+    if (news.some(n => n.bad)) setTimeout(sfx.bad, 300); else if (news.length) setTimeout(sfx.cash, 300);
+    $('rOk').textContent = S.round > ROUNDS ? 'See final value' : 'Next round';
+    $('resultOv').classList.add('show');
+  }
+  $('rOk').onclick = () => {
+    $('resultOv').classList.remove('show');
+    if (S.round > ROUNDS) return endGame();
+    S.phase = 'move'; rollOffers(); render();
+  };
+
+  function value() {
+    const unpaid = S.jobs.reduce((s, j) => s + j.bid, 0);
+    return { cash: S.cash, unpaid: Math.round(unpaid / 2), rep: S.rep * REP_VALUE, conn: S.conn * CONN_VALUE, total: S.cash + Math.round(unpaid / 2) + S.rep * REP_VALUE + S.conn * CONN_VALUE };
+  }
+  function endGame() {
+    S.done = true; S.phase = 'end'; render();
+    const v = value(), best = store.best || 0, isBest = v.total > best;
+    if (isBest) { store.best = v.total; save(store); }
+    $('endScore').textContent = v.total;
+    $('endBreak').textContent = `Cash ${v.cash} + unpaid work ${v.unpaid} + reputation ${v.rep} + connections ${v.conn}`;
+    $('endLine').textContent = S.op >= 60 ? 'The city loves you. The mayor wants a photo.' : S.op >= DIM_OPINION ? 'Solid. Nobody is writing songs about you, but nobody is protesting either.' : 'Rich-ish, but the public is not a fan. Next mayor might not be either.';
+    $('endIcon').textContent = S.op >= 60 ? '🏆' : S.op >= DIM_OPINION ? '🏁' : '😬';
+    $('endBest').textContent = isBest ? '★ New best!' : `Best: ${best}`;
+    $('endOv').classList.add('show'); sfx.end();
+  }
+
+  // ---------- credits placeholders ----------
+  $('creditsBtn').onclick = () => { if (!S || S.done) return; $('adAmt').textContent = AD_CREDITS; $('adBtn').disabled = S.adUsed; $('adBtn').style.opacity = S.adUsed ? .4 : 1; $('credOv').classList.add('show'); };
+  $('credClose').onclick = () => $('credOv').classList.remove('show');
+  $('adBtn').onclick = () => {
+    if (S.adUsed) return; S.adUsed = true; $('credOv').classList.remove('show'); $('adOv').classList.add('show');
+    let n = 3; $('adCount').textContent = n;
+    const iv = setInterval(() => { n--; $('adCount').textContent = n; if (n <= 0) { clearInterval(iv); $('adOv').classList.remove('show'); S.cash += AD_CREDITS; sfx.cash(); toast(`+${AD_CREDITS}🪙 from the ad`); render(); } }, 700);
+  };
+  $('buyBtn').onclick = () => { $('buyNote').style.color = 'var(--accent)'; sfx.tap(); };
+
+  let toastT;
+  function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 1800); }
+  $('todayCrisis').textContent = crisis.title; $('todayEffect').textContent = crisis.effect + ' A new one every day.';
+  $('bestLine').textContent = store.best ? `Your best company value: ${store.best}` : 'A game takes about 5 minutes.';
+  $('startBtn').onclick = () => { $('startOv').classList.remove('show'); sfx.tap(); newGame(); };
+  $('helpBtn').onclick = () => $('helpOv').classList.add('show'); $('helpClose').onclick = () => $('helpOv').classList.remove('show');
+  $('againBtn').onclick = () => { $('endOv').classList.remove('show'); store = load(); newGame(); };
+  $('homeBtn').onclick = () => { location.href = '../../index.html'; };
+  // show an empty board behind the start screen
+  S = { round: 1, cash: START_CASH, op: START_OPINION, rep: START_REP, conn: START_CONN, phase: 'none', jobs: [], offers: [] }; render();
+})();
+</script>
+</body>
+</html>
