@@ -1,5 +1,34 @@
 # Run progress
 
+Run started 2026-11-18 21:10 UTC. Brief: **Train Switcher switch controls.** A young playtester liked the game but couldn't work out the arrows; he knows track switches from toy trains (pull a handle). Add a Settings screen (gear on the start screen and the pause menu) with "Switch controls": **Tap the rail** (default), **Lever**, **Arrow** (unchanged). All modes: animated switch movement, active branch highlighted, first-time hint on level 1, mode saved in localStorage.
+
+Working branch: the GitHub Pages branch `claude/intelligent-lamport-sbfavc` directly (Miki asked for it). The session branch `claude/admiring-ramanujan-f60m4i` is fast-forwarded to match.
+
+Stay on scope: only Train Switcher controls this run.
+
+## Plan (this run)
+
+| # | Step | Estimate | Status |
+|---|---|---|---|
+| 1 | Read progress, commits and the game; write this plan | 10 min | done |
+| 2 | Settings screen: gear on start card and pause menu, three-mode picker, saved mode, "show hints again" | 25 min | |
+| 3 | Shared switch visuals: animated points that visibly swing, active branch glow; Tap-the-rail mode with big forgiving branch targets | 30 min | |
+| 4 | Lever mode: chunky lever beside each switch, placed clear of track and stations, tap or drag to flip, link rod to the points | 30 min | |
+| 5 | First-time hints (pulsing hand + one-line caption) on level 1, per mode; first vehicle waits a moment | 20 min | |
+| 6 | Smoke test `tools/smoke-train-controls.js` (all modes, phones, hints, saving); keep existing tests passing; check screenshots | 30 min | |
+| 7 | README, home page text, RATING-SHEET / RUN-LOG note; final report | 15 min | |
+
+## Later (not this run)
+- Playtest the three modes with the same child and note which one he gets in the first minute.
+- Maybe: tapping a station sets the whole route to it (one tap for the 4-station levels).
+
+## Log
+- 21:10 Read progress and commits. Pages branch is at 58f486b (difficulty + speed); no unfinished Train Switcher work.
+
+---
+
+# Previous run: City Hall Game
+
 Run started 2026-11-18 06:13 UTC. Brief: **City Hall Game**: three phone prototypes of Faizan's political strategy game (Mayor's Desk, Contract Hustle with Miki's business-owner angle, Street Clash), to play before Faizan and Miki meet.
 
 Working branch: `claude/laughing-cray-tbzkbv`, merged with the GitHub Pages branch `claude/intelligent-lamport-sbfavc` so the Pages branch can fast-forward to it. Each step is pushed to both.
