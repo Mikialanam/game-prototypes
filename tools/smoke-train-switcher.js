@@ -195,43 +195,45 @@ const PHONES = {
     Object.assign(summary.pause, { movesAgain: d2 !== d1, phase: await page.evaluate(() => __trains.phase), level: await page.evaluate(() => __trains.level) });
     check('header theme button pauses play, changes theme and resumes', summary.pause.paused && summary.pause.stoodStill && summary.pause.theme === 'boats' && summary.pause.movesAgain && summary.pause.phase === 'play' && summary.pause.level === 1 && pc.fits && !pc.smallButtons.length, { ...summary.pause, pc });
 
-    // default rule: flipping a switch under a vehicle crashes (even with an off-centre tap)
+    // default rule (kids): tapping a busy switch does nothing; it shakes and stays put, nothing crashes
     await page.evaluate(() => { __trains.setTheme('trains'); __trains.start(1); });
+    const safeRuleShown = await page.evaluate(() => !document.querySelector('#ruleSafe').hidden && document.querySelector('#ruleCrash').hidden);
     const busy = await waitBusy(page);
     if (check('a vehicle reaches the switch', !!busy)) {
       await page.touchscreen.tap(busy.x + 55, busy.y);
-      await page.waitForTimeout(250); await page.screenshot({ path: SHOT + 'tsw-crash-moment.png' });
-      await page.waitForSelector('#failOv.show', { timeout: 4000 }).catch(() => {});
-      await page.waitForTimeout(200); await page.screenshot({ path: SHOT + 'tsw-crash-card.png' });
-      summary.busyFlip.default = { constant: await page.evaluate(() => CRASH_ON_BUSY_FLIP), phase: await page.evaluate(() => __trains.phase), title: await text(page, '#failTitle'), why: await text(page, '#failWhy') };
-      const want = await page.evaluate(() => THEMES.trains.crashTitle), fc = await card(page, '#failOv');
-      check('default CRASH_ON_BUSY_FLIP still crashes', summary.busyFlip.default.constant === true && summary.busyFlip.default.phase === 'fail' && summary.busyFlip.default.title === want && await page.isVisible('#failOv'), summary.busyFlip.default);
-      check('fail card fits the screen', fc.fits && !fc.smallButtons.length, fc);
+      await page.waitForTimeout(120); await page.screenshot({ path: SHOT + 'tsw-gentle-refused.png' });
+      const after = (await snap(page)).switches[0];
+      summary.busyFlip.gentle = { constant: await page.evaluate(() => CRASH_ON_BUSY_FLIP), safeRuleShown, phase: await page.evaluate(() => __trains.phase), stateKept: after.state === busy.state };
+      check('default CRASH_ON_BUSY_FLIP = false: a busy switch refuses to flip and nothing crashes',
+        summary.busyFlip.gentle.constant === false && safeRuleShown && summary.busyFlip.gentle.phase === 'play' && summary.busyFlip.gentle.stateKept, summary.busyFlip.gentle);
     }
     await ctx.close();
   }
 
-  // ---------- 4. the gentle rule: a copy of the game with CRASH_ON_BUSY_FLIP = false ----------
-  async function gentle() {
-    const src = fs.readFileSync(FILE, 'utf8'), copy = SHOT + 'tsw-gentle-copy.html';
-    const edited = src.replace(/const CRASH_ON_BUSY_FLIP(\s*)= true;/, 'const CRASH_ON_BUSY_FLIP$1= false;');
+  // ---------- 4. the crash rule: a copy of the game with CRASH_ON_BUSY_FLIP = true ----------
+  async function crashRule() {
+    const src = fs.readFileSync(FILE, 'utf8'), copy = SHOT + 'tsw-crash-copy.html';
+    const edited = src.replace(/const CRASH_ON_BUSY_FLIP(\s*)= false;/, 'const CRASH_ON_BUSY_FLIP$1= true;');
     if (!check('CRASH_ON_BUSY_FLIP constant found in the game file', edited !== src)) return;
     fs.writeFileSync(copy, edited);
     const { page, ctx } = await open('360x640', copy);
-    const safeRuleShown = await page.evaluate(() => !document.querySelector('#ruleSafe').hidden && document.querySelector('#ruleCrash').hidden);
+    const crashRuleShown = await page.evaluate(() => document.querySelector('#ruleSafe').hidden && !document.querySelector('#ruleCrash').hidden);
     await page.evaluate(() => __trains.start(1));
     const busy = await waitBusy(page);
-    if (check('gentle rule: a vehicle reaches the switch', !!busy)) {
-      await page.touchscreen.tap(busy.x + 30, busy.y);
-      await page.waitForTimeout(120); await page.screenshot({ path: SHOT + 'tsw-gentle-refused.png' });
-      const after = (await snap(page)).switches[0];
-      summary.busyFlip.gentle = { safeRuleShown, phase: await page.evaluate(() => __trains.phase), stateKept: after.state === busy.state };
-      check('CRASH_ON_BUSY_FLIP = false: a busy switch refuses to flip and nothing crashes', safeRuleShown && summary.busyFlip.gentle.phase === 'play' && summary.busyFlip.gentle.stateKept, summary.busyFlip.gentle);
+    if (check('crash rule: a vehicle reaches the switch', !!busy)) {
+      await page.touchscreen.tap(busy.x + 55, busy.y);
+      await page.waitForTimeout(250); await page.screenshot({ path: SHOT + 'tsw-crash-moment.png' });
+      await page.waitForSelector('#failOv.show', { timeout: 4000 }).catch(() => {});
+      await page.waitForTimeout(200); await page.screenshot({ path: SHOT + 'tsw-crash-card.png' });
+      summary.busyFlip.crash = { crashRuleShown, phase: await page.evaluate(() => __trains.phase), title: await text(page, '#failTitle') };
+      const want = await page.evaluate(() => THEMES.trains.crashTitle), fc = await card(page, '#failOv');
+      check('CRASH_ON_BUSY_FLIP = true: a busy switch crashes', crashRuleShown && summary.busyFlip.crash.phase === 'fail' && summary.busyFlip.crash.title === want && await page.isVisible('#failOv'), summary.busyFlip.crash);
+      check('fail card fits the screen', fc.fits && !fc.smallButtons.length, fc);
     }
     await ctx.close(); fs.unlinkSync(copy);
   }
 
-  await Promise.all([...REQUIRED.map(playTheme), phone('360x640', '360x640', true), phone('iPhone SE', 'iphone-se', true), tapZone(), gentle()]);
+  await Promise.all([...REQUIRED.map(playTheme), phone('360x640', '360x640', true), phone('iPhone SE', 'iphone-se', true), tapZone(), crashRule()]);
   check('no console errors', !errs.length, errs);
   const result = { ...summary, checks: { passed, failed }, errs, screenshots: SHOT, ok: !failed.length && !errs.length };
   console.log(JSON.stringify(result, null, 2));

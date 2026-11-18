@@ -149,17 +149,20 @@ const want = n => !only.length || only.includes(n);
       await page.waitForTimeout(300);
       if (L === 3) await page.waitForTimeout(3000), await page.screenshot({ path: SHOT + 'ts-play.png' });
     }
-    // force a crash: flip a switch while a train is on it
-    let crashed = false;
+    // force a crash: flip a switch while a train is on it (skipped when the game has crashes switched off)
+    const crashesOn = await page.evaluate(() => typeof CRASH_ON_BUSY_FLIP === 'undefined' || CRASH_ON_BUSY_FLIP);
+    let crashed = !crashesOn, crashTitle = 'skipped: CRASH_ON_BUSY_FLIP is false';
     for (let i = 0; i < 400 && !crashed; i++) {
       const s = await snap(); const busy = s.switches.find(w => w.busy);
       if (busy) { await page.mouse.click(busy.x, busy.y); crashed = true; } else await page.waitForTimeout(30);
     }
-    await page.waitForSelector('#failOv.show', { timeout: 4000 });
-    await page.screenshot({ path: SHOT + 'ts-crash.png' });
-    const crashTitle = await page.textContent('#failTitle');
+    if (crashesOn) {
+      await page.waitForSelector('#failOv.show', { timeout: 4000 });
+      await page.screenshot({ path: SHOT + 'ts-crash.png' });
+      crashTitle = await page.textContent('#failTitle');
+      await page.click('#retryBtn');
+    } else if (await page.isVisible('#winOv.show')) await page.click('#nextBtn');
     // wrong station: leave switches pointing the wrong way
-    await page.click('#retryBtn');
     let wrongOk = false;
     for (let i = 0; i < 600; i++) {
       const ph = await page.evaluate(() => __trains.phase); if (ph !== 'play') break;
