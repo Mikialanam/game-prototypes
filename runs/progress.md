@@ -14,8 +14,8 @@ Stay on scope: only the three City Hall games this run.
 | 2 | Mayor's Desk: 10 requests, budget, groups, dirty tricks, daily crisis, election; quick phone check; README | 30 min | done |
 | 3 | Contract Hustle: 10 bid rounds, influence moves, computer mayor reacts to opinion; quick phone check; README | 30 min | done |
 | 4 | Street Clash: pick protester or police, 60s levels, slapstick only, opinion meter; quick phone check; README | 30 min | done |
-| 5 | Smoke test all three on emulated phones (`tools/smoke-city-hall.js`), check screenshots, fix layout | 30 min | next |
-| 6 | Home page "New", RATING-SHEET.md rows, RUN-LOG.md note; final report | 20 min | |
+| 5 | Smoke test all three on emulated phones (`tools/smoke-city-hall.js`), check screenshots, fix layout | 30 min | done |
+| 6 | Home page "New", RATING-SHEET.md rows, RUN-LOG.md note; final report | 20 min | next |
 
 Shared rules for all three: made-up city (Port Halden) and parties, even-handed satire, single player, phone portrait, Public Opinion meter 0–100, ~5-minute term, daily crisis seeded by date, credits with buy/ad placeholders that never win outright, tunable constants, `SOUND_ON`, best score in localStorage.
 
@@ -29,6 +29,7 @@ Shared rules for all three: made-up city (Port Halden) and parties, even-handed 
 - Note: another session pushed a Train Switcher change to the Pages branch at 06:17; merged it in. Always fetch and merge before pushing to Pages.
 - 06:27 Contract Hustle done and pushed. First bot check showed passing every round beat bidding and fair/premium bids never won; retuned (cheaper builds, stronger connections weight, private jobs 12→5). Now: smart bidder 375, lobbyist 360 but risky (205–464, usually frozen out), always-pass 290. Odds text on bid buttons made readable.
 - 06:35 Street Clash done and pushed. Bot runs at 360x640: protester bot clears level 1 with 4–8 people; police first counted any fast touch as a tackle, so even a careful bot sank opinion to 4. Now only running *into* someone tackles; a gentle bot ends level 1 at opinion 91. Recruit range up, boosts cheaper.
+- 06:45 `tools/smoke-city-hall.js` added: plays all three games end to end on 320x568, 360x640, 390x844 and 412x915; checks buttons on screen and ≥44px, no sideways scroll, daily crisis, tricks, ad placeholder, frozen-out mayor, real finger drag, level 2, best scores saved, no console errors, and that a heavy-handed police bot ends with lower opinion than a gentle one (gentle ~65, rough 0–7). 428/428 pass. Screenshots checked at 320 and 360; only fix needed was a smaller header on 320px phones in Mayor's Desk.
 
 ---
 
