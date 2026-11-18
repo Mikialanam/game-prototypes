@@ -1,5 +1,33 @@
 # Run progress
 
+Run started 2026-11-18 23:05 UTC. Brief: **Train Switcher, round 2 of the controls brief** (kindergarten playtester, toy-train handle). Most of it shipped in the previous run (Settings, three modes, saved choice, moving track, hints). Still missing from this brief: a **click sound with a mute toggle in Settings**, a **very easy first level** (one switch, slow train, two stations, whatever the difficulty), a **highlight of the whole active route**, and a tutorial hand that **shows one flip itself, then disappears**.
+
+Working branch: the GitHub Pages branch `claude/intelligent-lamport-sbfavc` (session branch `claude/admiring-ramanujan-f60m4i` kept in step). Live: https://mikialanam.github.io/game-prototypes/games/train-switcher/train-switcher.html
+
+Stay on scope: only Train Switcher.
+
+## Plan (this run)
+
+| # | Step | Estimate | Status |
+|---|---|---|---|
+| 1 | Check what's already done against the brief; write this plan | 5 min | done |
+| 2 | Switch click sound; Sound on/off toggle in Settings (saved) that silences every sound | 15 min | |
+| 3 | Very easy level 1 for every difficulty: one switch, two stations, slow, 3 trains, wide gaps | 15 min | |
+| 4 | Active route highlight: glow the whole path from the entry to the station a train would reach now, and light that station | 20 min | |
+| 5 | Tutorial: the hand demonstrates one flip (the track moves), then hands over to the player and disappears after their flip | 25 min | |
+| 6 | Tests: extend `smoke-train-controls.js`; rerun both Train Switcher tests and the home-page/other-game smoke test; check screenshots | 25 min | |
+| 7 | README, handover, check the live link | 10 min | |
+
+## Later (not this run)
+- Playtest with the same child (table in RATING-SHEET.md).
+
+## Log
+- 23:05 Previous run's work is live (game and home page). Gaps found: no mute toggle, flip sound is a beep not a click, level 1 is only easy on Kid, glow covers each switch's branch rather than the route, hint points but doesn't demonstrate.
+
+---
+
+# Previous run: Train Switcher controls (round 1)
+
 Run started 2026-11-18 21:10 UTC. Brief: **Train Switcher switch controls.** A young playtester liked the game but couldn't work out the arrows; he knows track switches from toy trains (pull a handle). Add a Settings screen (gear on the start screen and the pause menu) with "Switch controls": **Tap the rail** (default), **Lever**, **Arrow** (unchanged). All modes: animated switch movement, active branch highlighted, first-time hint on level 1, mode saved in localStorage.
 
 Working branch: the GitHub Pages branch `claude/intelligent-lamport-sbfavc` directly (Miki asked for it). The session branch `claude/admiring-ramanujan-f60m4i` is fast-forwarded to match.
