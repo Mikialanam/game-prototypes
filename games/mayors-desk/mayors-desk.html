@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#101826">
+<title>Mayor's Desk</title>
+<style>
+  :root { --bg: #101826; --panel: #1b2638; --panel2: #24324a; --text: #f1f5ff; --muted: #9aa8c4; --accent: #ffc94d;
+    --good: #4fd18b; --bad: #ff6b6b; --warn: #ffb347; --party: #2ec4b6; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; user-select: none; -webkit-user-select: none; }
+  body { display: flex; flex-direction: column; height: 100dvh; max-width: 480px; margin: 0 auto; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); gap: 8px; }
+  header { display: flex; align-items: center; gap: 8px; }
+  header h1 { font-size: 17px; margin: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pill { background: var(--panel); border-radius: 999px; padding: 6px 10px; font-size: 14px; font-weight: 700; white-space: nowrap; }
+  #meter { background: var(--panel); border-radius: 14px; padding: 8px 10px; }
+  #meter .row { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 5px; }
+  #meter .row b { color: var(--text); font-size: 15px; }
+  .bar { position: relative; height: 14px; border-radius: 7px; background: #0b111c; overflow: hidden; }
+  .bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 7px; transition: width .4s, background .4s; }
+  .bar .line { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #fff8; }
+  #groups { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .grp { background: var(--panel); border-radius: 12px; padding: 6px 4px 7px; text-align: center; font-size: 11px; color: var(--muted); position: relative; }
+  .grp .ic { font-size: 20px; line-height: 1.1; }
+  .grp .bar { height: 6px; margin-top: 4px; }
+  .grp.warn { outline: 2px solid var(--bad); animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { outline-color: transparent; } }
+  #card { flex: 1; min-height: 0; background: var(--panel2); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; overflow-y: auto; }
+  #card .top { display: flex; gap: 10px; align-items: center; }
+  #card .big { font-size: 40px; line-height: 1; }
+  #card h2 { font-size: 20px; margin: 0; line-height: 1.15; }
+  #card .who { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  #card p { font-size: 15px; line-height: 1.35; margin: 10px 0 8px; }
+  .facts { display: flex; gap: 6px; flex-wrap: wrap; font-size: 13px; }
+  .facts span { background: #0004; border-radius: 8px; padding: 4px 8px; }
+  .facts .late { color: var(--warn); }
+  .eff { font-size: 13px; color: var(--muted); margin-top: 8px; line-height: 1.6; }
+  .up { color: var(--good); font-weight: 700; } .dn { color: var(--bad); font-weight: 700; }
+  #card.crisis { background: #3a1f2b; border: 2px solid var(--bad); }
+  .tag { display: inline-block; background: var(--bad); color: #fff; font-size: 11px; font-weight: 800; letter-spacing: 1px; padding: 3px 8px; border-radius: 6px; margin-bottom: 8px; align-self: flex-start; }
+  #actions { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 8px; }
+  #actions.opts { grid-template-columns: 1fr; gap: 6px; }
+  button { font: inherit; color: inherit; border: 0; cursor: pointer; }
+  .act { min-height: 60px; border-radius: 14px; font-size: 17px; font-weight: 800; line-height: 1.1; padding: 6px; }
+  .act small { display: block; font-size: 12px; font-weight: 600; opacity: .85; margin-top: 3px; }
+  .act:active { transform: translateY(2px); }
+  .act:disabled { opacity: .35; }
+  .fund { background: var(--good); color: #062a16; } .delay { background: #5d6d8a; } .reject { background: var(--bad); color: #2b0606; }
+  .opt { background: var(--panel); text-align: left; padding: 10px 12px; min-height: 52px; font-size: 15px; }
+  .opt small { color: var(--muted); }
+  #tools { display: grid; grid-template-columns: 1fr 1fr 52px; gap: 8px; }
+  .tool { min-height: 48px; border-radius: 12px; background: var(--panel); font-size: 15px; font-weight: 700; }
+  .overlay { position: fixed; inset: 0; background: rgba(5,9,16,.88); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+  .overlay.show { display: flex; }
+  .sheet { background: var(--panel); border-radius: 20px; padding: 20px 16px; width: 100%; max-width: 420px; max-height: 100%; overflow-y: auto; text-align: center; }
+  .sheet h2 { margin: 0 0 6px; font-size: 24px; }
+  .sheet p { margin: 6px 0; font-size: 15px; line-height: 1.4; color: var(--muted); }
+  .sheet .btn { width: 100%; min-height: 58px; border-radius: 14px; font-size: 18px; font-weight: 800; margin-top: 10px; background: var(--accent); color: #2b1c00; }
+  .sheet .btn.alt { background: var(--panel2); color: var(--text); }
+  .party { display: block; width: 100%; text-align: left; border-radius: 14px; padding: 12px 14px; margin-top: 10px; min-height: 64px; color: #06131a; }
+  .party b { font-size: 18px; display: block; } .party span { font-size: 13px; opacity: .85; }
+  .crisisBox { background: #3a1f2b; border-radius: 12px; padding: 10px; margin: 10px 0; text-align: left; font-size: 14px; }
+  .paper { background: #f3ecd9; color: #1d1a12; border-radius: 6px; padding: 14px; text-align: left; font-family: Georgia, "Times New Roman", serif; }
+  .paper .mast { text-align: center; font-weight: 900; letter-spacing: 2px; border-bottom: 2px solid #1d1a12; padding-bottom: 4px; font-size: 13px; }
+  .paper h3 { font-size: 22px; line-height: 1.15; margin: 10px 0 6px; }
+  .paper .sub { font-size: 14px; font-style: italic; }
+  .paper .hit { font-family: system-ui, sans-serif; font-weight: 800; margin-top: 10px; font-size: 15px; }
+  .trick { display: block; width: 100%; text-align: left; background: var(--panel2); border-radius: 14px; padding: 12px; margin-top: 8px; min-height: 64px; }
+  .trick b { font-size: 16px; } .trick span { display: block; font-size: 13px; color: var(--muted); margin-top: 3px; }
+  .trick:disabled { opacity: .4; }
+  .bigscore { font-size: 60px; font-weight: 900; margin: 4px 0; line-height: 1; }
+  .newbest { color: var(--accent); font-weight: 800; min-height: 22px; }
+  #toast { position: fixed; left: 50%; bottom: 140px; transform: translateX(-50%); background: #000c; padding: 8px 14px; border-radius: 12px; font-size: 14px; font-weight: 700; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 5; max-width: 90%; text-align: center; }
+  #toast.on { opacity: 1; }
+  .fine { font-size: 12px !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">🏛️ Mayor's Desk</h1>
+  <div class="pill" id="weekPill">Wk 0/48</div>
+  <div class="pill" id="credPill">🪙 100</div>
+</header>
+<div id="meter">
+  <div class="row"><span>Public Opinion</span><span>win at <b id="winAt">50</b> · now <b id="opNum">50</b></span></div>
+  <div class="bar"><i id="opBar"></i><div class="line" id="opLine"></div></div>
+</div>
+<div id="groups"></div>
+<div id="card"></div>
+<div id="actions"></div>
+<div id="tools">
+  <button class="tool" id="tricksBtn">🎭 Dirty tricks</button>
+  <button class="tool" id="creditsBtn">🪙 Get credits</button>
+  <button class="tool" id="helpBtn" aria-label="Help">?</button>
+</div>
+
+<div class="overlay show" id="startOv"><div class="sheet">
+  <div style="font-size:48px">🏛️</div>
+  <h2>Mayor's Desk</h2>
+  <p>You're the new mayor of <b>Port Halden</b>. Ten requests, one budget, one election. Every yes upsets someone.</p>
+  <div class="crisisBox"><b>📰 Today's crisis:</b> <span id="todayCrisis"></span><br><span class="fine" style="color:var(--muted)">A new one every day.</span></div>
+  <p>Pick your party (both are equally ridiculous):</p>
+  <button class="party" id="pA" style="background:#2ec4b6"><b>⚓ Harbour Alliance</b><span>"Bold ideas, slightly over budget."</span></button>
+  <button class="party" id="pB" style="background:#ff9f43"><b>🔔 Civic League</b><span>"Common sense, eventually."</span></button>
+  <p class="fine" id="bestLine"></p>
+</div></div>
+
+<div class="overlay" id="newsOv"><div class="sheet">
+  <div class="paper"><div class="mast">THE HALDEN HERALD</div><h3 id="nHead"></h3><div class="sub" id="nSub"></div><div class="hit" id="nHit"></div></div>
+  <button class="btn" id="newsOk">OK</button>
+</div></div>
+
+<div class="overlay" id="tricksOv"><div class="sheet">
+  <h2>🎭 Dirty tricks</h2>
+  <p>Fast, cheap and effective. Each can be <b>exposed</b> later, and that hits Public Opinion hard. Once each per term.</p>
+  <div id="trickList"></div>
+  <button class="btn alt" id="tricksClose">Keep it clean</button>
+</div></div>
+
+<div class="overlay" id="credOv"><div class="sheet">
+  <h2>🪙 Credits</h2>
+  <p>Credits pay for requests and tricks. Leftover credits add to your score.</p>
+  <button class="btn" id="adBtn">▶ Watch an ad: +<span id="adAmt"></span> credits</button>
+  <p class="fine">Placeholder: no real ad. Once per term.</p>
+  <button class="btn alt" id="buyBtn">🛒 Buy credits</button>
+  <p class="fine" id="buyNote">Placeholder: no real payments. A store would sell small packs here, capped per term so money can't buy the election.</p>
+  <button class="btn alt" id="credClose">Back</button>
+</div></div>
+
+<div class="overlay" id="adOv"><div class="sheet"><h2>📺 Ad placeholder</h2><p>A short rewarded ad would play here.</p><p id="adCount" style="font-size:40px;color:var(--text)">3</p></div></div>
+
+<div class="overlay" id="helpOv"><div class="sheet" style="text-align:left">
+  <h2 style="text-align:center">How it works</h2>
+  <p>• Each request costs credits and takes weeks. <b>Fund</b> it for a small bump now and the rest when it's finished. Finish after week 48 and voters never see it.</p>
+  <p>• <b>Delay</b> is free but the group asking gets impatient. You can only delay a request once.</p>
+  <p>• <b>Reject</b> is free but upsets the group asking.</p>
+  <p>• Ignore a group for too long and they protest or the paper turns on you. Happy groups pull opinion up; angry ones drag it down.</p>
+  <p>• Your rival holds rallies that cost you support.</p>
+  <p>• Week 48: election. Win if Public Opinion is at least the line. Score = vote share, plus credits left if you win.</p>
+  <button class="btn" id="helpClose">Got it</button>
+</div></div>
+
+<div class="overlay" id="endOv"><div class="sheet">
+  <div style="font-size:52px" id="endIcon">🗳️</div>
+  <h2 id="endTitle">Election night</h2>
+  <p id="endLine"></p>
+  <div class="bigscore" id="endScore">0</div>
+  <p id="endBreak"></p>
+  <div class="newbest" id="endBest"></div>
+  <p class="fine" id="endStats"></p>
+  <button class="btn" id="againBtn">Run again</button>
+  <button class="btn alt" id="homeBtn">All games</button>
+</div></div>
+
+<div id="toast"></div>
+
+<script>
+// ================= TUNABLE CONSTANTS =================
+const START_CREDITS      = 100;   // budget for the term
+const START_OPINION      = 50;    // Public Opinion at the start (0-100)
+const START_MOOD         = 50;    // each group's mood at the start
+const WIN_OPINION        = 50;    // need at least this Public Opinion on election day
+const TERM_WEEKS         = 48;    // election week
+const REQUESTS_PER_TERM  = 10;    // city requests per term (plus today's crisis)
+const WEEKS_PER_TURN     = 4;     // calendar moves this far after each decision
+const CRISIS_AT          = 4;     // crisis arrives as the 5th card
+const ANNOUNCE_SHARE     = 0.4;   // share of a project's opinion effect you get when you fund it (rest on completion)
+const DRIFT_RATE         = 0.08;  // opinion drift per turn per point of average group mood above/below 50
+const NEGLECT_LIMIT      = 4;     // turns a group can go without a win before it lashes out
+const ANGRY_MOOD         = 25;    // a group this unhappy lashes out sooner
+const BACKLASH_HIT       = 6;     // opinion lost to a protest or bad headline
+const DELAY_MOOD_HIT     = 3;     // mood lost by the asking group when you delay
+const RIVAL_RALLY_TURNS  = [2, 5, 8]; // turns (0-based) when the rival holds a rally
+const RIVAL_RALLY_HIT    = 3;     // opinion lost to each rally
+const VOTE_SLOPE         = 0.8;   // vote share = 50 + (opinion - 50) * slope
+const AD_CREDITS         = 10;    // rewarded-ad placeholder, once per term
+const SOUND_ON           = true;
+// Dirty tricks: cost, risk of being exposed, opinion hit if exposed
+const TRICKS = {
+  spin:   { icon: '📺', name: 'Spin the media',          cost: 10, risk: 0.25, exposedHit: 12, what: 'Opinion +6 right now.' },
+  permit: { icon: '📋', name: "Delay the rival's permit", cost: 15, risk: 0.30, exposedHit: 15, what: "Cancels the rival's next two rallies." },
+  bribe:  { icon: '💼', name: 'Bribe an inspector',       cost: 20, risk: 0.40, exposedHit: 18, what: 'Every project in progress is finished today.' },
+};
+// =====================================================
+
+(() => {
+  const STORE = 'mayorsdesk.v1';
+  const $ = id => document.getElementById(id);
+  const load = () => { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch (e) { return {}; } };
+  const save = s => { try { localStorage.setItem(STORE, JSON.stringify(s)); } catch (e) {} };
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  let ac = null;
+  function beep(freq, dur = 0.08, type = 'triangle', vol = 0.12) {
+    if (!SOUND_ON) return;
+    try { ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      const o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.value = freq; g.gain.value = vol;
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + dur); o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + dur);
+    } catch (e) {}
+  }
+  const sfx = {
+    good: () => { beep(660); setTimeout(() => beep(880), 80); },
+    bad: () => { beep(220, .15, 'sawtooth', .08); },
+    tap: () => beep(520, .04),
+    news: () => { beep(392, .1, 'square', .06); setTimeout(() => beep(330, .14, 'square', .06), 110); },
+    win: () => [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, .14), i * 120)),
+    lose: () => [392, 330, 262].forEach((f, i) => setTimeout(() => beep(f, .2, 'sawtooth', .07), i * 160)),
+  };
+
+  // ---------- seeded random (date-based daily crisis) ----------
+  function hash(s) { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+  function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  const today = new Date().toISOString().slice(0, 10);
+
+  // ---------- content ----------
+  const GROUPS = [
+    { k: 'res', icon: '🏠', name: 'Residents' },
+    { k: 'bus', icon: '💼', name: 'Business' },
+    { k: 'pol', icon: '👮', name: 'Police' },
+    { k: 'act', icon: '✊', name: 'Activists' },
+  ];
+  const GNAME = Object.fromEntries(GROUPS.map(g => [g.k, g.name]));
+  // fund / reject effects: op = Public Opinion, res/bus/pol/act = group moods, cr = credits
+  const REQUESTS = [
+    { id: 'potholes', icon: '🕳️', title: 'Fix the Main Street potholes', who: 'res', cost: 15, weeks: 4, text: 'One pothole has been there so long it has a name (Gerald) and a fan page.', fund: { op: 6, res: 10, bus: 3 }, reject: { op: -3, res: -8 } },
+    { id: 'bus', icon: '🚌', title: 'New bus route to the harbour', who: 'act', cost: 25, weeks: 12, text: 'Activists want a green bus line. Shops on the route fear losing parking.', fund: { op: 7, act: 10, res: 6, bus: -5 }, reject: { act: -8, res: -3, bus: 3 } },
+    { id: 'park', icon: '🌳', title: 'Clean up Gullwing Park', who: 'act', cost: 10, weeks: 3, text: 'The pond has three shopping trolleys and one very confident goose.', fund: { op: 4, act: 8, res: 4 }, reject: { act: -6, res: -2 } },
+    { id: 'police', icon: '🚓', title: 'Police budget increase', who: 'pol', cost: 30, weeks: 6, text: 'The chief wants new cars. The current ones are held together with stickers.', fund: { op: 3, pol: 15, bus: 5, act: -10 }, reject: { op: -2, pol: -12, act: 5 } },
+    { id: 'march', icon: '📣', title: 'Permit for the Grand Grievance March', who: 'act', cost: 5, weeks: 1, text: 'They have 400 signs and only some are spelled right. Businesses dread the road closure.', fund: { op: 1, act: 10, pol: -5, bus: -5 }, reject: { op: -3, act: -10, pol: 4 } },
+    { id: 'tower', icon: '🏙️', title: 'Approve the Halden Spire tower', who: 'bus', cost: -20, weeks: 16, text: 'A developer offers 20 credits in fees for a 60-floor glass tower. Neighbours say it will block the sunset.', fund: { op: -2, bus: 12, res: -7, act: -8 }, reject: { bus: -10, act: 5, res: 3 } },
+    { id: 'bikes', icon: '🚲', title: 'Paint bike lanes on Harbour Road', who: 'act', cost: 12, weeks: 3, text: 'Cyclists are thrilled. Drivers have started a group called "Lanes Are Lies".', fund: { op: 3, act: 8, res: 2, bus: -5 }, reject: { act: -6 } },
+    { id: 'taxbreak', icon: '🧾', title: 'Tax break for small shops', who: 'bus', cost: 20, weeks: 2, text: 'The bakery says it is one more rent rise away from becoming a phone shop.', fund: { op: 4, bus: 12, res: 3, act: -3 }, reject: { bus: -9, op: -1 } },
+    { id: 'bodycams', icon: '📹', title: 'Body cameras for officers', who: 'act', cost: 18, weeks: 5, text: 'Activists call it accountability. The union calls it "a lot of footage of paperwork".', fund: { op: 5, act: 8, res: 3, pol: -4 }, reject: { act: -7, pol: 3 } },
+    { id: 'statue', icon: '🗿', title: 'Restore the Admiral Halden statue', who: 'res', cost: 15, weeks: 6, text: 'The statue is now 40% seagull. Heritage fans want it back; activists want a vote on who goes up next.', fund: { op: 2, res: 7, act: -5 }, reject: { res: -5, act: 3 } },
+    { id: 'trucks', icon: '🌮', title: 'Food truck permits downtown', who: 'bus', cost: 6, weeks: 2, text: 'Food trucks want lunch-hour spots. Restaurants want them parked in the sea.', fund: { op: 3, res: 6, bus: 2 }, reject: { bus: -5, res: -2 } },
+    { id: 'stadium', icon: '🏟️', title: 'New stadium for the Port Halden Gulls', who: 'bus', cost: 40, weeks: 20, text: 'The team has not won since 1987 but believes a new stadium will change that.', fund: { op: 9, bus: 12, res: 2, act: -8 }, reject: { bus: -8, res: -4, op: -2 } },
+    { id: 'watch', icon: '📱', title: 'Neighbourhood watch app', who: 'pol', cost: 8, weeks: 3, text: 'Mostly reports of "suspicious" cats. Police say it helps. Activists say it is snitching with emojis.', fund: { op: 1, pol: 8, res: 4, act: -6 }, reject: { pol: -6 } },
+    { id: 'wifi', icon: '📶', title: 'Free Wi-Fi at the library', who: 'res', cost: 10, weeks: 2, text: 'The library is the only place in town with chairs and no one asking you to buy a coffee.', fund: { op: 4, res: 7, act: 3 }, reject: { res: -5, act: -2 } },
+    { id: 'seawall', icon: '🌊', title: 'Repair the seawall', who: 'res', cost: 25, weeks: 10, text: 'Not exciting. Very important. The sea has started visiting the high street.', fund: { op: 7, res: 8, bus: 6 }, reject: { op: -6, res: -6, bus: -4 } },
+    { id: 'payrise', icon: '💰', title: 'Council pay rise', who: 'pol', cost: 10, weeks: 1, text: 'The council would like a raise "for morale". Morale is fine. The council is the problem.', fund: { op: -7, pol: 3, res: -4, act: -4 }, reject: { op: 4, res: 3 } },
+    { id: 'overtime', icon: '🎡', title: 'Overtime for the summer festival', who: 'pol', cost: 12, weeks: 2, text: 'Police want overtime to manage the crowds at the Shellfish Festival.', fund: { op: 2, pol: 9, bus: 5, act: -3 }, reject: { pol: -7, bus: -3 } },
+    { id: 'garden', icon: '🥕', title: 'Community garden on a car park', who: 'act', cost: 8, weeks: 4, text: 'Turn 40 parking spaces into vegetable beds. Shop owners are concerned about the carrots.', fund: { op: 3, act: 9, res: 3, bus: -6 }, reject: { act: -6, res: -1 } },
+  ];
+  const CRISES = [
+    { icon: '🐦', title: 'Seagull uprising on the boardwalk', text: 'Gulls are stealing chips at record rates. Tourists are fleeing. One gull took a whole pizza.',
+      opts: [ { label: 'Hire falconers', cost: 20, eff: { op: 6, res: 5, bus: 6, act: -5 } }, { label: 'Declare gull-friendly zones', cost: 5, eff: { op: 1, act: 7, bus: -6 } }, { label: 'Say nothing', cost: 0, eff: { op: -6, res: -4, bus: -4 } } ] },
+    { icon: '💧', title: 'Water main bursts on Market Street', text: 'A fountain nobody asked for. Shops are flooding.',
+      opts: [ { label: 'Emergency repair now', cost: 25, eff: { op: 7, res: 6, bus: 6 } }, { label: 'Cheap patch', cost: 10, eff: { op: 1, bus: 2, res: -2 } }, { label: 'Blame the last mayor', cost: 0, eff: { op: -4, bus: -6, res: -4 } } ] },
+    { icon: '🔥', title: 'Heat wave grips Port Halden', text: 'The ice cream van has a queue that reaches the next town.',
+      opts: [ { label: 'Open cooling centres', cost: 15, eff: { op: 6, res: 8, act: 3 } }, { label: 'Free ice cream photo-op', cost: 8, eff: { op: 2, bus: 4, act: -4 } }, { label: 'Tell people to "stay cool"', cost: 0, eff: { op: -5, res: -6 } } ] },
+    { icon: '😴', title: 'Councillor caught asleep on live stream', text: 'The video has 2 million views. The councillor is on your side.',
+      opts: [ { label: 'Public apology tour', cost: 10, eff: { op: 4, res: 3 } }, { label: 'Defend the nap', cost: 0, eff: { op: -4, pol: 2, act: -2 } }, { label: 'Free coffee at City Hall', cost: 5, eff: { op: 1, bus: 3 } } ] },
+    { icon: '⛴️', title: 'Ferry workers strike', text: 'Nobody can get to Little Halden island. Little Halden is furious.',
+      opts: [ { label: 'Negotiate a deal', cost: 20, eff: { op: 5, res: 6, bus: 6, act: 3 } }, { label: 'Send police to keep order', cost: 5, eff: { pol: 6, act: -9, op: -2 } }, { label: 'Wait it out', cost: 0, eff: { op: -5, bus: -7, res: -4 } } ] },
+    { icon: '🕳️', title: 'Sinkhole swallows a food truck', text: 'Nobody hurt. The tacos are lost. The truck is now a tourist attraction.',
+      opts: [ { label: 'Fill it in properly', cost: 18, eff: { op: 5, res: 6, bus: 3 } }, { label: 'Charge tourists to look', cost: 0, eff: { bus: 6, res: -5, op: -2, cr: 10 } }, { label: 'Put a fence round it', cost: 6, eff: { op: 1, res: 2 } } ] },
+    { icon: '⚡', title: 'Power cut during the big match', text: 'The Gulls were winning for once. The whole city is in mourning.',
+      opts: [ { label: 'Pay for a replay screening', cost: 15, eff: { op: 6, res: 6, bus: 4 } }, { label: 'Blame the power company', cost: 0, eff: { op: -2, bus: -5, res: 2 } }, { label: 'Free street party', cost: 10, eff: { op: 3, res: 5, pol: -4 } } ] },
+    { icon: '🦀', title: 'Crab invasion on Beach Road', text: 'Thousands of crabs. Very organised. Some say they are protesting.',
+      opts: [ { label: 'Hire a crab relocation team', cost: 15, eff: { op: 5, res: 5, act: 4 } }, { label: 'Turn it into a festival', cost: 8, eff: { op: 3, bus: 7, act: -4 } }, { label: 'Close the road', cost: 0, eff: { op: -4, bus: -5 } } ] },
+  ];
+  const crisisToday = CRISES[Math.floor(rng(hash('crisis' + today))() * CRISES.length)];
+
+  const BACKLASH = {
+    res: { head: 'RESIDENTS: "DOES THE MAYOR EVEN LIVE HERE?"', sub: 'A petition with 9,000 signatures and one very angry pensioner is delivered to City Hall.' },
+    bus: { head: 'SHOPS SHUTTER IN PROTEST', sub: 'Business owners close for an afternoon. Three of them were closed anyway.' },
+    pol: { head: 'POLICE UNION CALLS A "SLOW WEEK"', sub: 'Parking tickets fall 90%. Nobody is sure if this is bad.' },
+    act: { head: 'PROTEST OUTSIDE CITY HALL', sub: 'Chants of "Mayor, mayor, hear our prayer" go on until well past lunch.' },
+  };
+  const EXPOSED = {
+    spin: { head: 'SPIN DOCTOR CAUGHT ON HOT MIC', sub: '"Just tell them it\'s fine" — a recording the mayor\'s office would rather you didn\'t hear.' },
+    permit: { head: 'MAYOR\'S OFFICE "LOST" RIVAL\'S PERMIT', sub: 'The form was found in a drawer labelled "Do not find".' },
+    bribe: { head: 'INSPECTOR\'S NEW BOAT RAISES QUESTIONS', sub: 'The boat is called "Signed Off". Investigators are not amused.' },
+  };
+
+  // ---------- state ----------
+  let S, store = load();
+  window.__mayor = { get S() { return S; }, CRISES, REQUESTS, crisisToday };
+
+  function newTerm(party) {
+    const r = Math.random;
+    const pool = REQUESTS.slice().sort(() => r() - .5).slice(0, REQUESTS_PER_TERM).map(c => ({ ...c, delayed: false }));
+    pool.splice(CRISIS_AT, 0, { crisis: true, ...crisisToday });
+    const parties = { A: { name: 'Harbour Alliance', color: '#2ec4b6', rival: 'Civic League', rivalName: 'Councillor Pat Brennock' },
+                      B: { name: 'Civic League', color: '#ff9f43', rival: 'Harbour Alliance', rivalName: 'Councillor Sam Okafor-Reyes' } };
+    S = { party: parties[party], credits: START_CREDITS, op: START_OPINION, week: 0, turn: 0, queue: pool,
+      mood: { res: START_MOOD, bus: START_MOOD, pol: START_MOOD, act: START_MOOD },
+      neglect: { res: 0, bus: 0, pol: 0, act: 0 }, projects: [], tricksUsed: {}, exposures: [], rallyCancels: 0,
+      adUsed: false, funded: 0, rejected: 0, delayedN: 0, events: [], touched: {}, done: false };
+    document.documentElement.style.setProperty('--party', S.party.color);
+    $('title').textContent = (S.party.name === 'Harbour Alliance' ? '⚓ ' : '🔔 ') + S.party.name;
+    $('winAt').textContent = WIN_OPINION;
+    render(); showCard();
+  }
+
+  // ---------- effects ----------
+  function apply(eff, scale = 1) {
+    for (const k in eff) {
+      const v = Math.round(eff[k] * scale);
+      if (k === 'op') S.op = clamp(S.op + v, 0, 100);
+      else if (k === 'cr') S.credits += v;
+      else { S.mood[k] = clamp(S.mood[k] + v, 0, 100); if (v > 0) S.touched[k] = true; }
+    }
+  }
+  const arrows = v => v >= 7 ? '▲▲' : v > 0 ? '▲' : v <= -7 ? '▼▼' : '▼';
+  function effText(eff) {
+    const parts = [];
+    if (eff.op) parts.push(`<span class="${eff.op > 0 ? 'up' : 'dn'}">Opinion ${arrows(eff.op)}</span>`);
+    for (const g of GROUPS) if (eff[g.k]) parts.push(`<span class="${eff[g.k] > 0 ? 'up' : 'dn'}">${g.icon}${arrows(eff[g.k])}</span>`);
+    if (eff.cr) parts.push(`<span class="up">+${eff.cr}🪙</span>`);
+    return parts.join(' &nbsp;') || 'no effect';
+  }
+
+  // ---------- render ----------
+  function opColor(v) { return v >= WIN_OPINION + 10 ? 'var(--good)' : v >= WIN_OPINION ? '#a3d977' : v >= WIN_OPINION - 10 ? 'var(--warn)' : 'var(--bad)'; }
+  function render() {
+    $('weekPill').textContent = `Wk ${S.week}/${TERM_WEEKS}`;
+    $('credPill').textContent = '🪙 ' + S.credits;
+    $('opNum').textContent = Math.round(S.op);
+    $('opBar').style.width = S.op + '%'; $('opBar').style.background = opColor(S.op);
+    $('opLine').style.left = WIN_OPINION + '%';
+    $('groups').innerHTML = GROUPS.map(g => {
+      const m = S.mood[g.k], warn = S.neglect[g.k] >= NEGLECT_LIMIT - 1 || m <= ANGRY_MOOD;
+      return `<div class="grp ${warn ? 'warn' : ''}" data-g="${g.k}"><div class="ic">${g.icon}</div>${g.name}<div class="bar"><i style="width:${m}%;background:${m >= 60 ? 'var(--good)' : m >= 40 ? 'var(--warn)' : 'var(--bad)'}"></i></div></div>`;
+    }).join('');
+  }
+
+  function showCard() {
+    render();
+    const c = S.queue[0];
+    if (!c) return election();
+    const card = $('card'), acts = $('actions');
+    if (c.crisis) {
+      card.className = 'crisis';
+      card.innerHTML = `<span class="tag">TODAY'S CRISIS</span><div class="top"><div class="big">${c.icon}</div><div><h2>${c.title}</h2></div></div><p>${c.text}</p><div class="eff">Pick one. Everyone is watching.</div>`;
+      acts.className = 'opts';
+      acts.innerHTML = c.opts.map((o, i) => `<button class="act opt" data-o="${i}" ${o.cost > S.credits ? 'disabled' : ''}>${o.label} <small>${o.cost ? o.cost + '🪙 · ' : 'free · '}${effText(o.eff)}</small></button>`).join('');
+      acts.querySelectorAll('.opt').forEach(b => b.onclick = () => decideCrisis(+b.dataset.o));
+      return;
+    }
+    card.className = '';
+    const doneWeek = S.week + c.weeks, late = doneWeek > TERM_WEEKS;
+    const costTxt = c.cost < 0 ? `+${-c.cost}🪙 fees` : `${c.cost}🪙`;
+    card.innerHTML = `<div class="top"><div class="big">${c.icon}</div><div><h2>${c.title}</h2><div class="who">Asked by ${GROUPS.find(g => g.k === c.who).icon} ${GNAME[c.who]}${c.delayed ? ' · <b style="color:var(--warn)">delayed once</b>' : ''}</div></div></div>
+      <p>${c.text}</p>
+      <div class="facts"><span>${c.cost < 0 ? 'Earns' : 'Costs'} ${costTxt}</span><span class="${late ? 'late' : ''}">Ready in ${c.weeks} wk${c.weeks > 1 ? 's' : ''}${late ? ' · after the election!' : ''}</span><span>${S.queue.length} on the desk</span></div>
+      <div class="eff">If funded: ${effText(c.fund)}<br>If rejected: ${effText(c.reject)}</div>`;
+    acts.className = '';
+    const canFund = c.cost <= S.credits;
+    acts.innerHTML = `<button class="act fund" id="bFund" ${canFund ? '' : 'disabled'}>${c.cost < 0 ? 'Approve' : 'Fund'}<small>${canFund ? (c.cost < 0 ? '+' + (-c.cost) : '−' + c.cost) + ' 🪙' : 'not enough 🪙'}</small></button>
+      <button class="act delay" id="bDelay" ${c.delayed ? 'disabled' : ''}>Delay<small>${c.delayed ? 'already' : 'free'}</small></button>
+      <button class="act reject" id="bReject">Reject<small>free</small></button>`;
+    $('bFund').onclick = () => decide('fund');
+    $('bDelay').onclick = () => decide('delay');
+    $('bReject').onclick = () => decide('reject');
+  }
+
+  function decide(kind) {
+    if (S.done) return;
+    const c = S.queue.shift(); S.touched = {};
+    if (kind === 'fund') {
+      S.credits -= c.cost; S.funded++;
+      const { op = 0, ...groups } = c.fund;
+      apply(groups); apply({ op }, ANNOUNCE_SHARE);
+      S.projects.push({ c, doneWeek: S.week + c.weeks, opRest: op - Math.round(op * ANNOUNCE_SHARE) });
+      sfx.good(); toast(`${c.icon} Funded: ${c.title}`);
+    } else if (kind === 'delay') {
+      c.delayed = true; S.delayedN++;
+      S.queue.splice(Math.min(2, S.queue.length), 0, c);
+      S.mood[c.who] = clamp(S.mood[c.who] - DELAY_MOOD_HIT, 0, 100);
+      sfx.tap(); toast(`⏳ Delayed. ${GNAME[c.who]} are getting impatient.`);
+    } else {
+      apply(c.reject); S.rejected++;
+      sfx.bad(); toast(`❌ Rejected: ${c.title}`);
+    }
+    endTurn();
+  }
+  function decideCrisis(i) {
+    const c = S.queue.shift(), o = c.opts[i]; S.touched = {};
+    S.credits -= o.cost; apply(o.eff);
+    (o.eff.op || 0) >= 0 ? sfx.good() : sfx.bad();
+    S.events.push({ head: o.label.toUpperCase() + ': CITY REACTS', sub: c.title + '. ' + (o.eff.op > 2 ? 'Most people approve.' : o.eff.op < 0 ? 'It did not go down well.' : 'Reactions are mixed.'), hit: effText(o.eff) });
+    endTurn();
+  }
+
+  function endTurn() {
+    S.week = Math.min(TERM_WEEKS, S.week + WEEKS_PER_TURN);
+    // projects finishing
+    S.projects = S.projects.filter(p => {
+      if (p.doneWeek <= S.week) { apply({ op: p.opRest }); if (p.opRest) toast(`✅ ${p.c.title}: done! Opinion ${p.opRest > 0 ? '+' : ''}${p.opRest}`); return false; }
+      return true;
+    });
+    // group moods pull opinion
+    const avg = GROUPS.reduce((s, g) => s + S.mood[g.k], 0) / GROUPS.length;
+    S.op = clamp(S.op + (avg - 50) * DRIFT_RATE, 0, 100);
+    // neglect -> backlash
+    for (const g of GROUPS) {
+      S.neglect[g.k] = S.touched[g.k] ? 0 : S.neglect[g.k] + 1;
+      if (S.neglect[g.k] >= NEGLECT_LIMIT || (S.mood[g.k] <= ANGRY_MOOD && S.neglect[g.k] >= 2)) {
+        S.neglect[g.k] = 0; S.mood[g.k] = clamp(S.mood[g.k] - 3, 0, 100); S.op = clamp(S.op - BACKLASH_HIT, 0, 100);
+        S.events.push({ ...BACKLASH[g.k], hit: `${GROUPS.find(x => x.k === g.k).icon} ${GNAME[g.k]} feel ignored · Opinion −${BACKLASH_HIT}` });
+      }
+    }
+    // rival rally
+    if (RIVAL_RALLY_TURNS.includes(S.turn)) {
+      if (S.rallyCancels > 0) { S.rallyCancels--; S.events.push({ head: 'RIVAL RALLY CANCELLED', sub: `${S.party.rivalName} (${S.party.rival}) could not get a permit "for paperwork reasons".`, hit: 'No damage this time' }); }
+      else { S.op = clamp(S.op - RIVAL_RALLY_HIT, 0, 100); S.events.push({ head: `${S.party.rivalName.toUpperCase()} DRAWS A CROWD`, sub: `The ${S.party.rival} candidate promises "everything you have, but better". The crowd loves it.`, hit: `Opinion −${RIVAL_RALLY_HIT}` }); }
+    }
+    // exposures due
+    S.exposures = S.exposures.filter(x => { if (x.turn <= S.turn) { expose(x.k); return false; } return true; });
+    S.turn++;
+    flushEvents(showCard);
+  }
+  function expose(k) {
+    S.op = clamp(S.op - TRICKS[k].exposedHit, 0, 100);
+    S.events.push({ ...EXPOSED[k], hit: `🎭 Dirty trick exposed · Opinion −${TRICKS[k].exposedHit}`, bad: true });
+  }
+
+  function flushEvents(then) {
+    render();
+    const e = S.events.shift();
+    if (!e) return then();
+    $('nHead').textContent = e.head; $('nSub').textContent = e.sub; $('nHit').innerHTML = e.hit || '';
+    $('newsOv').classList.add('show'); e.bad ? sfx.bad() : sfx.news();
+    $('newsOk').onclick = () => { $('newsOv').classList.remove('show'); flushEvents(then); };
+  }
+
+  // ---------- tricks ----------
+  function openTricks() {
+    if (!S || S.done) return;
+    $('trickList').innerHTML = Object.entries(TRICKS).map(([k, t]) => {
+      const used = S.tricksUsed[k], poor = t.cost > S.credits;
+      return `<button class="trick" data-k="${k}" ${used || poor ? 'disabled' : ''}><b>${t.icon} ${t.name} · ${t.cost}🪙</b><span>${t.what} Risk of exposure: <b style="color:var(--bad)">${Math.round(t.risk * 100)}%</b> (Opinion −${t.exposedHit}).${used ? ' Used this term.' : poor ? ' Not enough credits.' : ''}</span></button>`;
+    }).join('');
+    $('trickList').querySelectorAll('.trick').forEach(b => b.onclick = () => useTrick(b.dataset.k));
+    $('tricksOv').classList.add('show');
+  }
+  function useTrick(k) {
+    const t = TRICKS[k];
+    S.credits -= t.cost; S.tricksUsed[k] = true;
+    if (k === 'spin') S.op = clamp(S.op + 6, 0, 100);
+    if (k === 'permit') S.rallyCancels += 2;
+    if (k === 'bribe') { S.projects.forEach(p => apply({ op: p.opRest })); const n = S.projects.length; S.projects = []; toast(`💼 ${n} project${n === 1 ? '' : 's'} "passed inspection"`); }
+    if (Math.random() < t.risk) S.exposures.push({ k, turn: S.turn + 1 + Math.floor(Math.random() * 3) });
+    $('tricksOv').classList.remove('show'); sfx.tap();
+    if (k !== 'bribe') toast(`${t.icon} Done. Let's hope nobody finds out.`);
+    render(); showCard();
+  }
+
+  // ---------- credits placeholders ----------
+  function openCredits() {
+    if (!S || S.done) return;
+    $('adAmt').textContent = AD_CREDITS; $('adBtn').disabled = S.adUsed; $('adBtn').style.opacity = S.adUsed ? .4 : 1;
+    $('credOv').classList.add('show');
+  }
+  $('adBtn').onclick = () => {
+    if (S.adUsed) return; S.adUsed = true; $('credOv').classList.remove('show'); $('adOv').classList.add('show');
+    let n = 3; $('adCount').textContent = n;
+    const iv = setInterval(() => { n--; $('adCount').textContent = n; if (n <= 0) { clearInterval(iv); $('adOv').classList.remove('show'); S.credits += AD_CREDITS; sfx.good(); toast(`+${AD_CREDITS}🪙 from the ad`); render(); showCard(); } }, 700);
+  };
+  $('buyBtn').onclick = () => { $('buyNote').style.color = 'var(--accent)'; sfx.tap(); };
+
+  // ---------- election ----------
+  function election() {
+    // leaks of dirty tricks that never came out during the term land now
+    S.week = TERM_WEEKS; S.exposures.forEach(x => expose(x.k)); S.exposures = [];
+    const unfinished = S.projects.length;
+    if (unfinished) S.events.push({ head: `${unfinished} PROJECT${unfinished > 1 ? 'S' : ''} STILL UNFINISHED`, sub: 'Voters see scaffolding, not results.', hit: 'No extra credit for half-built things' });
+    flushEvents(() => {
+      S.done = true;
+      const vote = clamp(Math.round(50 + (S.op - 50) * VOTE_SLOPE), 1, 99), won = S.op >= WIN_OPINION;
+      const kept = won ? Math.max(0, S.credits) : 0; // credits only count if you win, so hoarding can't beat governing
+      const score = vote + kept;
+      const best = store.best || 0, isBest = score > best;
+      if (isBest) { store.best = score; save(store); }
+      $('endIcon').textContent = won ? '🎉' : '📦';
+      $('endTitle').textContent = won ? 'Re-elected!' : 'Voted out';
+      $('endLine').textContent = won ? `You beat ${S.party.rivalName} with ${vote}% of the vote.` : `${S.party.rivalName} wins. You got ${vote}% of the vote. Time to write a memoir.`;
+      $('endScore').textContent = score;
+      $('endBreak').textContent = won ? `${vote}% vote share + ${kept} credits left` : `${vote}% vote share (leftover credits only count if you win)`;
+      $('endBest').textContent = isBest ? '★ New best!' : `Best: ${best}`;
+      $('endStats').textContent = `Funded ${S.funded} · Rejected ${S.rejected} · Delayed ${S.delayedN} · Tricks ${Object.keys(S.tricksUsed).length} · Final opinion ${Math.round(S.op)}`;
+      $('endOv').classList.add('show');
+      won ? sfx.win() : sfx.lose();
+    });
+  }
+
+  // ---------- misc UI ----------
+  let toastT;
+  function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 1800); }
+  $('todayCrisis').textContent = crisisToday.icon + ' ' + crisisToday.title;
+  $('bestLine').textContent = store.best ? `Your best score: ${store.best}` : 'One term takes about 5 minutes.';
+  $('pA').onclick = () => { $('startOv').classList.remove('show'); sfx.tap(); newTerm('A'); };
+  $('pB').onclick = () => { $('startOv').classList.remove('show'); sfx.tap(); newTerm('B'); };
+  $('tricksBtn').onclick = openTricks; $('tricksClose').onclick = () => $('tricksOv').classList.remove('show');
+  $('creditsBtn').onclick = openCredits; $('credClose').onclick = () => $('credOv').classList.remove('show');
+  $('helpBtn').onclick = () => $('helpOv').classList.add('show'); $('helpClose').onclick = () => $('helpOv').classList.remove('show');
+  $('againBtn').onclick = () => { $('endOv').classList.remove('show'); store = load(); $('bestLine').textContent = `Your best score: ${store.best || 0}`; $('startOv').classList.add('show'); };
+  $('homeBtn').onclick = () => { location.href = '../../index.html'; };
+})();
+</script>
+</body>
+</html>
