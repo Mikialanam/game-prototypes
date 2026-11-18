@@ -11,7 +11,7 @@ Stay on scope: only Train Switcher controls this run.
 | # | Step | Estimate | Status |
 |---|---|---|---|
 | 1 | Read progress, commits and the game; write this plan | 10 min | done |
-| 2 | Settings screen: gear on start card and pause menu, three-mode picker, saved mode, "show hints again" | 25 min | |
+| 2 | Settings screen: gear on start card and pause menu, three-mode picker, saved mode, "show hints again" | 25 min | done |
 | 3 | Shared switch visuals: animated points that visibly swing, active branch glow; Tap-the-rail mode with big forgiving branch targets | 30 min | |
 | 4 | Lever mode: chunky lever beside each switch, placed clear of track and stations, tap or drag to flip, link rod to the points | 30 min | |
 | 5 | First-time hints (pulsing hand + one-line caption) on level 1, per mode; first vehicle waits a moment | 20 min | |
@@ -24,6 +24,7 @@ Stay on scope: only Train Switcher controls this run.
 
 ## Log
 - 21:10 Read progress and commits. Pages branch is at 58f486b (difficulty + speed); no unfinished Train Switcher work.
+- 21:25 Settings screen done: gear on the start card and the pause card (the header button's card, now titled "Paused" during play). Mode saved as `controls` in the existing save. Checked on iPhone SE. Next: rail mode and moving points.
 
 ---
 

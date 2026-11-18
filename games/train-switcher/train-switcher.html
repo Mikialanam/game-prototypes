@@ -54,6 +54,19 @@
   .pick.on { background: #ffffff; color: #1b2a22; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255,204,51,.35); }
   .pick.on::after { content: '✓'; position: absolute; top: -9px; right: -7px; width: 24px; height: 24px; border-radius: 50%;
     background: var(--accent); color: #2e2300; font-size: 15px; line-height: 24px; font-weight: 900; }
+  /* gear: opens Settings (on the start card and the pause card) */
+  .card { position: relative; }
+  .gear { position: absolute; top: 6px; right: 6px; width: 48px; height: 48px; border: 0; border-radius: 16px; padding: 0; font-family: inherit;
+    background: rgba(255,255,255,.1); color: var(--text); font-size: 28px; line-height: 1; }
+  .card h2.withgear { min-height: 44px; display: flex; align-items: center; justify-content: center; padding: 0 42px; }
+  .gear:active { transform: scale(.94) rotate(30deg); }
+  #setOv { z-index: 18; }
+  /* switch controls picker: one big row per mode */
+  .cpicker { display: grid; gap: 8px; margin: 6px 0 8px; }
+  .cpicker .pick { flex-direction: row; justify-content: flex-start; gap: 12px; min-height: 68px; padding: 8px 12px; text-align: left; }
+  .cpicker .pick .e { font-size: 30px; flex: none; width: 38px; text-align: center; }
+  .cpicker .pick small { display: block; font-size: 13px; font-weight: 600; opacity: .85; margin-top: 2px; }
+  .cpicker .pick .tag { font-size: 11px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; opacity: .7; margin-left: 4px; }
   #fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; }
   @media (max-height: 620px) {
     .card { padding: 16px 16px; } .card h2 { font-size: 24px; } .emoji { font-size: 40px; }
@@ -80,16 +93,17 @@
 <!-- words marked data-w are filled in from the THEMES table (train / boat / plane, station / dock / airport) -->
 <div class="overlay show" id="startOv">
   <div class="card">
+    <button class="gear setOpen" aria-label="Settings">⚙️</button>
     <div class="emoji" id="startEmoji">🚂</div>
-    <h2 id="startTitle">Train Switcher</h2>
+    <h2 class="withgear" id="startTitle">Train Switcher</h2>
     <div class="picker"></div>
     <p class="plabel">Who's playing?</p>
     <div class="dpicker"></div>
     <p class="plabel">Speed</p>
     <div class="dpicker spicker"></div>
-    <p class="rule"><b>Tap a big arrow</b> to send each <span data-w="one">train</span> to the <span data-w="place">station</span> of <b>its colour</b>.</p>
-    <p class="rule" id="ruleCrash">Don't tap an arrow while a <span data-w="one">train</span> is <b style="color:var(--bad)">on it</b>, <span data-w="oops">or it crashes</span>.</p>
-    <p class="rule" id="ruleSafe" hidden>An arrow won't turn while a <span data-w="one">train</span> is <b style="color:var(--bad)">on it</b>. Wait for it to pass.</p>
+    <p class="rule"><b id="howTo">Tap a big arrow</b> to send each <span data-w="one">train</span> to the <span data-w="place">station</span> of <b>its colour</b>.</p>
+    <p class="rule" id="ruleCrash">Don't move a switch while a <span data-w="one">train</span> is <b style="color:var(--bad)">on it</b>, <span data-w="oops">or it crashes</span>.</p>
+    <p class="rule" id="ruleSafe" hidden>A switch won't move while a <span data-w="one">train</span> is <b style="color:var(--bad)">on it</b>. Wait for it to pass.</p>
     <button class="btn" id="startBtn">Start</button>
   </div>
 </div>
@@ -119,7 +133,8 @@
 
 <div class="overlay top" id="themeOv">
   <div class="card">
-    <h2>Theme, difficulty, speed</h2>
+    <button class="gear setOpen" aria-label="Settings">⚙️</button>
+    <h2 class="withgear" id="themeHead">Theme, difficulty, speed</h2>
     <div class="picker"></div>
     <p class="plabel">Who's playing?</p>
     <div class="dpicker"></div>
@@ -127,6 +142,15 @@
     <div class="dpicker spicker"></div>
     <p class="sub" id="themeNote">Speed changes straight away. A new difficulty starts again at level 1 and keeps its own best level.</p>
     <button class="btn" id="themeDone">Done</button>
+  </div>
+</div>
+<div class="overlay top" id="setOv">
+  <div class="card">
+    <h2>⚙️ Settings</h2>
+    <p class="plabel">Switch controls</p>
+    <div class="cpicker"></div>
+    <button class="btn ghost line" id="hintsAgain">Show the first-time hint again</button>
+    <button class="btn" id="setDone">Done</button>
   </div>
 </div>
 <canvas id="fx"></canvas>
@@ -195,6 +219,16 @@ const THEMES = {
             page: ['#101a3d', '#1f2d60', '#f2f5ff', '#aab7e2'], ground: ['#101c4a', '#2c4390'],
             path: ['#ffffff', '#ffffff', '#ffffff'], sw: ['#ffffff', '#c4d0ea', '#14235a'] },
 };
+// Switch controls (picked in Settings, saved on the device). Every mode moves the same switches; only the way you move them changes.
+//   rail: tap the branch of track you want; the switch swings onto it.   lever: push the lever beside each switch, like a toy train set.
+//   arrow: tap the big round arrow button (the original control).
+//   how: the start card's instruction.   hint: the first-time caption on level 1 ({one} = train / boat / plane).
+const CONTROLS = {
+  rail:  { emoji: '👆', label: 'Tap the rail', tag: 'easiest', note: 'Tap the track you want. The switch moves onto it.', how: 'Tap the track you want', hint: 'Tap the track you want the {one} to take' },
+  lever: { emoji: '🕹️', label: 'Lever', tag: 'toy train set', note: 'Push the lever beside each switch, left or right.', how: 'Push a lever', hint: 'Push the lever to move the track' },
+  arrow: { emoji: '➡️', label: 'Arrow', tag: 'original', note: 'Tap the big arrow to turn it.', how: 'Tap a big arrow', hint: 'Tap the arrow to turn it' },
+};
+const DEFAULT_CONTROLS       = 'rail';
 const SOUND_ON               = true;
 // =====================================================
 
@@ -245,6 +279,7 @@ const SOUND_ON               = true;
 
   // ---------- state ----------
   let phase = 'menu', level = 1, cfg, nodes, switches, trains, spawned, delivered, spawnT, last, crashAt, flashes;
+  let gesture = null;                                                    // a finger held on a lever (lever mode)
   let paused = false, clock = 0, ripples = [], decor = [], card = null;  // card: what the win / fail card is showing
   let swR = 40, tapR = TAP_RADIUS, stS = 1;                              // switch radius, tap reach, station scale: worked out from the screen
   // best levels are kept per difficulty; a best from before difficulties existed counts as Adult
@@ -253,6 +288,7 @@ const SOUND_ON               = true;
   let diffChangedInPlay = false;
   let speedName = SPEEDS[load().speed] ? load().speed : SPEEDS[DEFAULT_SPEED] ? DEFAULT_SPEED : 'normal', SP = SPEEDS[speedName] || { speed: 1 };
   const bestOf = () => (load().bests || {})[diffName] || 0;
+  let ctrlName = CONTROLS[load().controls] ? load().controls : CONTROLS[DEFAULT_CONTROLS] ? DEFAULT_CONTROLS : 'arrow', C = CONTROLS[ctrlName];
   let themeName = THEMES[load().theme] ? load().theme : THEMES[DEFAULT_THEME] ? DEFAULT_THEME : Object.keys(THEMES)[0], T = THEMES[themeName];
   const cv = $('cv'), ctx = cv.getContext('2d'); let W = 0, H = 0;
   const P = id => ({ x: nodes[id].x * W, y: nodes[id].y * H });
@@ -378,7 +414,7 @@ const SOUND_ON               = true;
       const crashed = card.kind === 'crash';
       $('failEmoji').textContent = crashed ? T.crashEmoji : '😬';
       $('failTitle').textContent = crashed ? T.crashTitle : `Wrong ${T.place}!`;
-      $('failWhy').textContent = crashed ? `An arrow was tapped while a ${T.one} was on it.` : `Each ${T.one} must reach the ${T.place} of its own colour.`;
+      $('failWhy').textContent = crashed ? `A switch was moved while a ${T.one} was on it.` : `Each ${T.one} must reach the ${T.place} of its own colour.`;
       $('failBest').textContent = `Level ${level} · best level cleared (${D.label}): ${bestOf()}`;
     }
   }
@@ -395,6 +431,7 @@ const SOUND_ON               = true;
     $('title').textContent = T.title; $('themeBtn').textContent = T.emoji;
     $('startEmoji').textContent = T.emoji; $('startTitle').textContent = T.title;
     document.querySelectorAll('[data-w]').forEach(el => el.textContent = T[el.dataset.w]);
+    $('howTo').textContent = C.how;
     document.querySelectorAll('.picker .pick').forEach(b => { const on = b.dataset.theme === name; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
     renderCard(); if (cfg) updateBar();
     return true;
@@ -403,6 +440,7 @@ const SOUND_ON               = true;
     paused = phase === 'play';                                   // the game waits while the picker is open
     diffChangedInPlay = false;
     $('themeDone').textContent = paused ? 'Keep playing' : 'Done';
+    $('themeHead').textContent = paused ? 'Paused' : 'Theme, difficulty, speed';
     $('themeOv').classList.add('show');
   }
   function closeThemes() {
@@ -453,6 +491,37 @@ const SOUND_ON               = true;
   });
   document.querySelectorAll('.themeOpen').forEach(b => { b.textContent = 'Theme, difficulty or speed'; b.addEventListener('click', openThemes); });
 
+  // ---------- switch controls (Settings) ----------
+  function setControls(name, remember = true) {
+    if (!CONTROLS[name]) return false;
+    ctrlName = name; C = CONTROLS[name]; gesture = null;
+    if (remember) { const s = load(); s.controls = name; save(s); }
+    document.querySelectorAll('.cpicker .pick').forEach(b => { const on = b.dataset.ctrl === name; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+    $('howTo').textContent = C.how;
+    if (nodes) measure();
+    return true;
+  }
+  document.querySelectorAll('.cpicker').forEach(box => {
+    for (const key in CONTROLS) {
+      const k = CONTROLS[key], b = document.createElement('button'), e = document.createElement('span'), l = document.createElement('span');
+      b.type = 'button'; b.className = 'pick'; b.dataset.ctrl = key; e.className = 'e'; e.textContent = k.emoji;
+      l.innerHTML = `<span></span><span class="tag"></span><small></small>`; l.children[0].textContent = k.label; l.children[1].textContent = k.tag; l.children[2].textContent = k.note;
+      b.append(e, l); b.addEventListener('click', () => { setControls(key); beep(500, .06); buzz(6); }); box.appendChild(b);
+    }
+  });
+  let setWasPaused = false;
+  function openSettings() {
+    setWasPaused = paused; paused = phase === 'play' || paused;   // opened from the start card or the pause card; play stays stopped
+    $('hintsAgain').textContent = 'Show the first-time hint again';
+    $('setOv').classList.add('show');
+  }
+  function closeSettings() { $('setOv').classList.remove('show'); paused = setWasPaused; }
+  document.querySelectorAll('.setOpen').forEach(b => b.addEventListener('click', openSettings));
+  $('setDone').addEventListener('click', closeSettings);
+  $('hintsAgain').addEventListener('click', () => { const s = load(); delete s.hints; save(s); resetHint();
+    $('hintsAgain').textContent = 'Hints will show on level 1 ✓'; beep(600, .06); });
+
+  function resetHint() {}   // filled in with the first-time hints
   // ---------- loop ----------
   function frame(now) {
     const dt = Math.min(.05, (now - (last || now)) / 1000); last = now; clock += dt;
@@ -708,6 +777,7 @@ const SOUND_ON               = true;
   window.__trains = { get phase() { return phase; }, get level() { return level; },
     get theme() { return themeName; }, setTheme(name) { return setTheme(name); },
     get difficulty() { return diffName; }, setDifficulty(name) { return setDifficulty(name); }, get crash() { return D.crash; }, get speed() { return speedName; }, setSpeed(name) { return setSpeed(name); }, cfg(n) { return levelCfg(n); },
+    get controls() { return ctrlName; }, setControls(name) { return setControls(name); },
     get paused() { return paused; }, start(n) { start(Math.max(1, n | 0)); },
     layout() {   // sizes the layout test checks: switch buttons, tap reach and the boxes the stations fill
       const stage = cv.getBoundingClientRect();
@@ -724,7 +794,7 @@ const SOUND_ON               = true;
           return [c, s.next.findIndex(reaches)]; }))])) };
     } };
 
-  resize(); buildLevel(); setTheme(themeName, false); setDifficulty(diffName, false); setSpeed(speedName, false); updatePill(); requestAnimationFrame(frame);
+  resize(); buildLevel(); setTheme(themeName, false); setDifficulty(diffName, false); setSpeed(speedName, false); setControls(ctrlName, false); updatePill(); requestAnimationFrame(frame);
 })();
 </script>
 </body>
