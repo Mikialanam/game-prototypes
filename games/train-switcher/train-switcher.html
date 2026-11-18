@@ -232,7 +232,11 @@ const DEFAULT_CONTROLS       = 'rail';
 const SWITCH_MOVE_TIME       = 0.3;  // seconds a switch takes to swing across, so you can see what your tap did (all modes)
 const RAIL_TAP_WIDTH         = 56;   // px either side of a branch's centre line that counts as tapping that branch (rail mode)
 const HUB_TAP_R              = 40;   // px: tapping the switch itself, not clearly on either branch, flips it (rail mode)
-const POINTS_LEN             = 46;   // px: length of the moving piece of track at each switch (rail and lever modes)
+const POINTS_LEN             = 46;
+const LEVER_SIZE             = 1;    // lever scale (1 = base 50px wide, knob 26px across on a 360px-wide phone)
+const LEVER_TILT             = 34;   // degrees the lever leans left or right: it leans the way the track goes
+const LEVER_TAP_R            = 50;   // px: a tap or drag starting this close to a lever moves it (nearest lever wins)
+const LEVER_DRAG             = 14;   // px a finger must slide sideways to push the lever over   // px: length of the moving piece of track at each switch (rail and lever modes)
 const SOUND_ON               = true;
 // =====================================================
 
@@ -321,9 +325,34 @@ const SOUND_ON               = true;
       st.forEach(b => { const d = Math.hypot(a.x - b.x, a.y - b.y) - 40 * stS; r = Math.min(r, d - SWITCH_GAP); reach = Math.min(reach, d); });
     });
     swR = Math.max(20, r); tapR = Math.max(swR + 12, reach);
+    placeLevers();
     makeDecor();
   }
 
+  // Lever mode: each switch gets a lever beside it, in the clearest spot nearby: off the tracks, stations, other switches and levers,
+  // and on screen. lv: the lever's pivot (stage px); its body is a circle of radius lr around (lv.x, lv.y - lr * .5).
+  const leverR = () => 30 * LEVER_SIZE * Math.max(.85, stS);
+  const segDist = (x, y, A, B) => { const dx = B.x - A.x, dy = B.y - A.y, f = Math.max(0, Math.min(1, ((x - A.x) * dx + (y - A.y) * dy) / (dx * dx + dy * dy || 1))); return Math.hypot(x - A.x - dx * f, y - A.y - dy * f); };
+  function placeLevers() {
+    const lr = leverR(), segs = [];
+    for (const id in nodes) (nodes[id].next || []).forEach(m => segs.push([P(id), P(m)]));
+    const placed = [];
+    switches.forEach(s => {
+      const A = P(s.id); let best = null;
+      for (let deg = 0; deg < 360; deg += 10) for (const d of [64, 76, 88, 100, 114]) {
+        const a = deg * Math.PI / 180, x = A.x + Math.cos(a) * d * Math.max(.85, stS), y = A.y + Math.sin(a) * d * Math.max(.85, stS), cy = y - lr * .5;
+        let c = Math.min(x - lr - 4, W - x - lr - 4, cy - lr - 4, H - y - 14);
+        segs.forEach(([p, q]) => c = Math.min(c, segDist(x, cy, p, q) - lr - 20));
+        Object.values(nodes).forEach(n => { const q = P(n.id);
+          if (n.kind === 'station') c = Math.min(c, Math.hypot(x - q.x, cy - q.y) - lr - 38 * stS);
+          if (n.kind === 'switch') c = Math.min(c, Math.hypot(x - q.x, cy - q.y) - lr - pointsLen(n) - 6); });
+        placed.forEach(o => c = Math.min(c, Math.hypot(x - o.x, y - o.y) - 2 * lr - 10));
+        const score = Math.min(c, 24) - .12 * d - 6 * Math.abs(Math.sin(a));   // clear first, then close to its switch, then beside it rather than above or below
+        if (!best || score > best.score) best = { x, y, score, clear: c };
+      }
+      s.lv = best; placed.push(best);
+    });
+  }
   // Background details (grass, trees, stars), scattered the same way every time and kept off the routes.
   function makeDecor() {
     let seed = 7; const R = () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -743,6 +772,32 @@ const SOUND_ON               = true;
     ctx.fillStyle = busy ? '#ff5d5d' : T.sw[1]; circle(x, y, 10); ctx.fill(); ctx.fillStyle = '#ffffff'; circle(x, y, 4); ctx.fill();   // pivot
     if (busy && (s.shake > 0 || Math.sin(clock * 10) > 0)) { ctx.strokeStyle = 'rgba(255,93,93,.55)'; ctx.lineWidth = 4; circle(x, y, len * .7); ctx.stroke(); }
   }
+  // lever mode: a chunky lever that leans the way the track goes, joined to its switch by a rod; lamps on the base show the side
+  const leftIdx = s => P(s.next[0]).x <= P(s.next[1]).x ? 0 : 1;
+  function drawLever(s) {
+    const busy = occupied(s), k = leverR() / 30, sh = s.shake > 0 ? Math.sin(s.shake * 38) * 5 * s.shake : 0, x = s.lv.x + sh, y = s.lv.y, A = P(s.id);
+    const side = i => (i === leftIdx(s) ? -1 : 1) * LEVER_TILT * Math.PI / 180;
+    const tilt = side(0) + (side(1) - side(0)) * ease(s.anim) + (s.drag || 0);
+    ctx.lineCap = 'round'; ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 7; line(A.x, A.y, x, y + 4 * k);           // the rod to the switch
+    ctx.strokeStyle = busy ? 'rgba(255,93,93,.8)' : 'rgba(255,255,255,.75)'; ctx.lineWidth = 3; ctx.setLineDash([6, 5]); line(A.x, A.y, x, y + 4 * k); ctx.setLineDash([]);
+    if (s.pulse > 0) { ctx.strokeStyle = `rgba(255,255,255,${s.pulse * .9})`; ctx.lineWidth = 5; circle(x, y - 14 * k, 30 * k + (1 - s.pulse) * 26); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(0,0,0,.35)'; roundRect(x - 27 * k, y - 6 * k, 54 * k, 22 * k, 8 * k); ctx.fill();                  // base shadow
+    ctx.fillStyle = busy ? '#3b4046' : '#4a3424'; roundRect(x - 27 * k, y - 10 * k, 54 * k, 22 * k, 8 * k); ctx.fill();
+    ctx.strokeStyle = busy ? '#ff5d5d' : '#2a1c12'; ctx.lineWidth = 3; ctx.stroke();
+    [-1, 1].forEach(d => { const on = Math.sign(tilt) === d;                                                                        // side lamps
+      ctx.fillStyle = on ? (busy ? '#ff5d5d' : '#fff6c8') : 'rgba(255,255,255,.18)'; ctx.beginPath();
+      ctx.moveTo(x + d * 22 * k, y + 1 * k); ctx.lineTo(x + d * 13 * k, y - 5 * k); ctx.lineTo(x + d * 13 * k, y + 7 * k); ctx.closePath(); ctx.fill(); });
+    ctx.save(); ctx.translate(x, y); ctx.rotate(tilt);
+    const L = 34 * k, g = s.grab ? 1.12 : 1;
+    ctx.strokeStyle = '#1d1d1d'; ctx.lineWidth = 11 * k; line(0, 0, 0, -L);                                                     // stick
+    ctx.strokeStyle = busy ? '#8a9199' : '#d9dde2'; ctx.lineWidth = 6.5 * k; line(0, 0, 0, -L);
+    ctx.fillStyle = '#1d1d1d'; circle(0, -L, 15 * k * g); ctx.fill();                                                          // knob
+    ctx.fillStyle = busy ? '#8a9199' : '#ffffff'; circle(0, -L, 12 * k * g); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.9)'; circle(-4 * k, -L - 4 * k, 3.5 * k); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,.12)'; circle(2 * k, -L + 3 * k, 8 * k); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#1d1d1d'; circle(x, y, 5 * k); ctx.fill();                                                                // pivot
+  }
   function drawSwitch(s, L) {
     const A = P(s.id), busy = occupied(s), r = swR * (1 + s.pulse * .12), x = A.x + (s.shake > 0 ? Math.sin(s.shake * 38) * 7 * s.shake : 0), y = A.y;
     const rimW = Math.max(5, r * .13);
@@ -786,6 +841,7 @@ const SOUND_ON               = true;
       const p = P(id), s = (1 + Math.max(0, n.pulse) * .25) * stS; L.home(n, p, s);
       if (n.pulse < 0) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 5; ctx.lineCap = 'round'; line(p.x - 14, p.y - 6, p.x + 14, p.y + 22); line(p.x + 14, p.y - 6, p.x - 14, p.y + 22); }
     }
+    if (ctrlName === 'lever') switches.forEach(drawLever);
     switches.forEach(s => ctrlName === 'arrow' ? drawSwitch(s, L) : drawPoints(s));
     flashes.forEach(f => { ctx.strokeStyle = `rgba(255,255,255,${1 - f.t / .6})`; ctx.lineWidth = 4; circle(f.x, f.y + 8, 30 + f.t * 90); ctx.stroke(); });
     // vehicles go on top of the switch buttons, so they are never hidden
@@ -824,7 +880,33 @@ const SOUND_ON               = true;
     if (ctrlName === 'lever') { leverDown(e, x, y); return; }
     const best = arrowHit(x, y); ripples.push({ x, y, t: 0, hit: !!best }); if (best) flip(best);
   });
-  function leverDown() {}   // filled in with lever mode
+  // Lever mode: tap a lever, or slide it left or right. A slide pushes it over as soon as the finger has moved LEVER_DRAG px towards
+  // the other side; sliding back again pushes it back. A tap (finger lifted without sliding) flips it.
+  function leverHit(x, y) {
+    let best = null, bd = LEVER_TAP_R;
+    switches.forEach(s => { const d = Math.hypot(s.lv.x - x, s.lv.y - leverR() * .5 - y); if (d <= bd) { bd = d; best = s; } });
+    return best;
+  }
+  function leverDown(e, x, y) {
+    const s = leverHit(x, y); ripples.push({ x, y, t: 0, hit: !!s }); if (!s) return;
+    gesture = { s, id: e.pointerId, x0: x, y0: y, sx: x, moved: false, flipped: false }; s.grab = true;
+    try { $('stage').setPointerCapture(e.pointerId); } catch (err) {}
+  }
+  function endGesture(tap) {
+    const g = gesture; if (!g) return; gesture = null; g.s.grab = false; g.s.drag = 0;
+    if (tap && !g.moved && !g.flipped) flip(g.s);
+  }
+  $('stage').addEventListener('pointermove', e => {
+    const g = gesture; if (!g || e.pointerId !== g.id) return;
+    const { x, y } = stageXY(e), dx = x - g.x0;
+    if (Math.hypot(x - g.sx, y - g.y0) > 18) g.moved = true;
+    if (phase !== 'play' || paused) return;
+    const toward = P(g.s.next[1 - g.s.state]).x > P(g.s.next[g.s.state]).x ? 1 : -1;   // which way the lever goes to flip
+    g.s.drag = Math.max(-.25, Math.min(.25, dx / 120));
+    if (dx * toward >= LEVER_DRAG) { flip(g.s); g.flipped = true; g.x0 = x; g.s.drag = 0; }
+  });
+  $('stage').addEventListener('pointerup', e => { if (gesture && e.pointerId === gesture.id) endGesture(phase === 'play' && !paused); });
+  $('stage').addEventListener('pointercancel', e => { if (gesture && e.pointerId === gesture.id) endGesture(false); });
   $('startBtn').addEventListener('click', () => start(1));
   $('nextBtn').addEventListener('click', () => start(level + 1));
   $('retryBtn').addEventListener('click', () => start(level));
@@ -846,6 +928,7 @@ const SOUND_ON               = true;
     snapshot() {
       const stage = cv.getBoundingClientRect();
       return { switches: switches.map(s => ({ id: s.id, state: s.state, busy: occupied(s), x: stage.left + P(s.id).x, y: stage.top + P(s.id).y, anim: s.anim,
+          lever: s.lv && { x: stage.left + s.lv.x, y: stage.top + s.lv.y - leverR() * .5, r: leverR(), clear: s.lv.clear, side: Math.sign((s.state === leftIdx(s) ? -1 : 1)) },
           // rail mode: where each branch's track is (switch and far end, page px), for tests that tap along it
           branches: s.next.map(m => ({ to: m, ax: stage.left + P(s.id).x, ay: stage.top + P(s.id).y, bx: stage.left + P(m).x, by: stage.top + P(m).y })) })),
         trains: trains.map(t => ({ colour: t.colour, at: t.route[t.route.length - 1], d: t.cum[t.cum.length - 1] - t.d })),
