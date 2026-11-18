@@ -12,8 +12,8 @@ Stay on scope: only the three City Hall games this run.
 |---|---|---|---|
 | 1 | Merge Pages branch; write this plan | 10 min | done |
 | 2 | Mayor's Desk: 10 requests, budget, groups, dirty tricks, daily crisis, election; quick phone check; README | 30 min | done |
-| 3 | Contract Hustle: 10 bid rounds, influence moves, computer mayor reacts to opinion; quick phone check; README | 30 min | next |
-| 4 | Street Clash: pick protester or police, 60s levels, slapstick only, opinion meter; quick phone check; README | 30 min | |
+| 3 | Contract Hustle: 10 bid rounds, influence moves, computer mayor reacts to opinion; quick phone check; README | 30 min | done |
+| 4 | Street Clash: pick protester or police, 60s levels, slapstick only, opinion meter; quick phone check; README | 30 min | next |
 | 5 | Smoke test all three on emulated phones (`tools/smoke-city-hall.js`), check screenshots, fix layout | 30 min | |
 | 6 | Home page "New", RATING-SHEET.md rows, RUN-LOG.md note; final report | 20 min | |
 
@@ -25,8 +25,9 @@ Shared rules for all three: made-up city (Port Halden) and parties, even-handed 
 
 ## Log
 - 06:13 Read progress and commits. Pages branch had City Builder etc.; merged into this branch (clean).
-- 06:40 Mayor's Desk done and pushed to both branches. Bot check at 360x640 (12 terms per policy): fund-all wins 5/12, value bot 6/12, random 0/12. Fixed an exploit: reject-everything scored 100 from leftover credits, so credits now only count on a win. Toast moved off the meter.
+- 06:20 Mayor's Desk done and pushed to both branches. Bot check at 360x640 (12 terms per policy): fund-all wins 5/12, value bot 6/12, random 0/12. Fixed an exploit: reject-everything scored 100 from leftover credits, so credits now only count on a win. Toast moved off the meter.
 - Note: another session pushed a Train Switcher change to the Pages branch at 06:17; merged it in. Always fetch and merge before pushing to Pages.
+- 06:27 Contract Hustle done and pushed. First bot check showed passing every round beat bidding and fair/premium bids never won; retuned (cheaper builds, stronger connections weight, private jobs 12→5). Now: smart bidder 375, lobbyist 360 but risky (205–464, usually frozen out), always-pass 290. Odds text on bid buttons made readable.
 
 ---
 
