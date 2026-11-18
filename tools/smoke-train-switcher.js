@@ -219,6 +219,7 @@ const PHONES = {
   // ---------- 4. difficulty and speed: Expert crashes, levels scale, speed changes mid-level, bests kept per difficulty ----------
   async function crashRule() {
     const { page, ctx } = await open('360x640');
+    await page.evaluate(() => __trains.setControls && __trains.setControls('arrow'));   // the crash check taps beside the switch: an Arrow-mode tap
     // level 2: level 1 is the same easy warm-up on every difficulty
     const D = await page.evaluate(() => ({ kid: (__trains.setDifficulty('kid'), __trains.cfg(2)), adult: (__trains.setDifficulty('adult'), __trains.cfg(2)), expert: (__trains.setDifficulty('expert'), __trains.cfg(2)) }));
     summary.difficulty = D;

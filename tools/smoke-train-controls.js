@@ -18,7 +18,7 @@ const PHONES = {
   fs.mkdirSync(SHOT, { recursive: true });
   const browser = await chromium.launch();
   const errs = [], failed = []; let passed = 0;
-  const summary = { settings: {}, rail: {}, lever: {}, movement: {}, hints: {}, bot: {} };
+  const summary = { settings: {}, rail: {}, lever: {}, movement: {}, hints: {}, extras: {}, bot: {} };
   const check = (name, ok, detail) => { if (ok) passed++; else failed.push(detail === undefined ? name : `${name} (${JSON.stringify(detail)})`); return ok; };
 
   let openCount = 0;
@@ -189,36 +189,73 @@ const PHONES = {
     await ctx.close();
   }
 
-  // ---------- 5. First-time hints: level 1 only, once per mode, following the hint is the right move ----------
+  // ---------- 5. First-time tutorial: one hand shows one flip on level 1, then disappears; once won, not again ----------
   async function hints(mode, phone) {
     const { page, ctx } = await open(phone), out = summary.hints[mode] = {};
     await page.evaluate(m => __trains.setControls(m), mode);
-    await page.click('#startBtn'); await page.waitForTimeout(600);
+    await page.click('#startBtn');
+    const s0 = (await sw(page, 's1')).state;
+    await page.waitForFunction(() => { const h = __trains.hint; return h.spot && h.t > 1.0; }, null, { timeout: 5000 });
     const h = await page.evaluate(() => __trains.hint), noTrainYet = (await snap(page)).trains.length === 0;
-    out.first = h;
-    check(`${mode}: hint shows on level 1 (hand and caption), and the first vehicle waits`, h.on && !!h.spot && h.caption.length > 0 && noTrainYet, { h, noTrainYet });
+    out.during = h;
+    check(`${mode}: tutorial hand and caption show on level 1, and the first vehicle waits`, h.on && !!h.spot && h.caption.length > 0 && noTrainYet && (await sw(page, 's1')).state === s0, { h, noTrainYet });
     await page.screenshot({ path: SHOT + `tsc-hint-${mode}.png` });
     const cap = await page.evaluate(() => { const r = document.getElementById('hint').getBoundingClientRect(); return { h: Math.round(r.height), left: r.left, right: r.right }; });
-    check(`${mode}: hint caption is one line and on screen`, cap.h <= 44 && cap.left >= 0 && cap.right <= (await page.evaluate(() => innerWidth)), cap);
-    // do what the hint shows, with the mode's own kind of finger move
-    const before = await sw(page, 's1');
-    if (mode === 'lever') { await page.mouse.move(before.lever.x, before.lever.y); await page.mouse.down(); await page.mouse.move(before.lever.x + h.spot.slide * 40, before.lever.y, { steps: 6 }); await page.mouse.up(); }
-    else await page.touchscreen.tap(h.spot.x, h.spot.y);
+    check(`${mode}: tutorial caption is one line and on screen`, cap.h <= 44 && cap.left >= 0 && cap.right <= (await page.evaluate(() => innerWidth)), cap);
+    // with no input at all, the hand flips the switch once, to the first vehicle's station, then goes away
+    await page.waitForFunction(() => __trains.hint.flipped, null, { timeout: 5000 });
+    await page.waitForTimeout(150); await page.screenshot({ path: SHOT + `tsc-hint-${mode}-flipped.png` });
+    await page.waitForFunction(() => !__trains.hint.on, null, { timeout: 5000 });
     await page.waitForFunction(() => __trains.snapshot().trains.length > 0, null, { timeout: 8000 });
-    const s = await snap(page), after = s.switches[0], first = s.trains[0];
-    out.after = await page.evaluate(() => __trains.hint);
-    check(`${mode}: following the hint points the switch at the first vehicle's ${'station'}, and the hint goes away`, after.state !== before.state && s.routes.s1[first.colour] === after.state && !out.after.on && !out.after.caption, { before: before.state, after: after.state, need: s.routes.s1[first.colour], hint: out.after });
+    const s = await snap(page), first = s.trains[0];
+    out.after = { flippedTo: s.switches[0].state, need: s.routes.s1[first.colour], route: await page.evaluate(() => __trains.route), hint: await page.evaluate(() => __trains.hint) };
+    check(`${mode}: the hand flips the switch by itself, onto the first vehicle's route, then disappears`,
+      out.after.flippedTo !== s0 && out.after.flippedTo === out.after.need && !out.after.hint.spot && !out.after.hint.caption, out.after);
     out.result = await playLevel(page, mode);
-    check(`${mode}: level 1 is won after following the hint`, out.result === 'win', out.result);
+    check(`${mode}: level 1 is won after the tutorial`, out.result === 'win', out.result);
     await page.waitForSelector('#winOv.show'); await page.waitForTimeout(600); await page.click('#nextBtn'); await page.waitForTimeout(300);
-    check(`${mode}: no hint on level 2`, !(await page.evaluate(() => __trains.hint.on)));
+    check(`${mode}: no tutorial on level 2`, !(await page.evaluate(() => __trains.hint.on)));
     await page.evaluate(() => __trains.start(1)); await page.waitForTimeout(100);
-    check(`${mode}: hint is remembered as seen (not shown again on level 1, even after a reload)`, !(await page.evaluate(() => __trains.hint.on)) &&
+    check(`${mode}: once level 1 is won the tutorial doesn't come back (even after a reload)`, !(await page.evaluate(() => __trains.hint.on)) &&
       await page.reload().then(() => page.evaluate(() => (__trains.start(1), !__trains.hint.on))));
     // Settings: "Show the first-time hint again" brings it back for the next child
     await page.locator('#themeBtn').tap(); await page.locator('#themeOv .gear').tap(); await page.locator('#hintsAgain').tap();
     await page.locator('#setDone').tap(); await page.locator('#themeDone').tap(); await page.evaluate(() => __trains.start(1)); await page.waitForTimeout(150);
     check(`${mode}: "Show the first-time hint again" brings it back on level 1`, await page.evaluate(() => __trains.hint.on));
+    // the player moving a switch during the demo stops it (the hand never undoes their move)
+    await page.waitForFunction(() => __trains.hint.spot, null, { timeout: 5000 });
+    const w = await sw(page, 's1'); await move(page, mode, w, 1 - w.state); await page.waitForTimeout(2500);
+    const mine = await sw(page, 's1');
+    check(`${mode}: a player's own flip during the demo ends it and stays`, mine.state === 1 - w.state && !(await page.evaluate(() => __trains.hint.on)), { before: w.state, now: mine.state });
+    await ctx.close();
+  }
+
+  // ---------- 5b. Sound on/off, level 1 is easy on every difficulty, the active route ----------
+  async function extras() {
+    const { page, ctx } = await open('360x640'), out = summary.extras = {};
+    await page.evaluate(() => { localStorage.setItem('trainswitcher.v1', JSON.stringify({ hints: { rail: true } })); }); await page.reload();
+    await page.evaluate(() => __trains.start(2));
+    let w = await sw(page, 's1'), n0 = await page.evaluate(() => __trains.soundsPlayed);
+    await move(page, 'rail', w, 1 - w.state); await page.waitForTimeout(50);
+    out.soundOnFlip = (await page.evaluate(() => __trains.soundsPlayed)) - n0;
+    check('a switch flip plays a sound (sound on by default)', out.soundOnFlip >= 1 && await page.evaluate(() => __trains.sound), out);
+    await page.locator('#themeBtn').tap(); await page.locator('#themeOv .gear').tap();
+    out.soundLabel = (await page.textContent('#soundBtn')).trim(); await page.locator('#soundBtn').tap(); out.soundLabelOff = (await page.textContent('#soundBtn')).trim();
+    await page.locator('#setDone').tap(); await page.locator('#themeDone').tap(); await page.reload(); await page.evaluate(() => __trains.start(2));
+    w = await sw(page, 's1'); n0 = await page.evaluate(() => __trains.soundsPlayed);
+    await move(page, 'rail', w, 1 - w.state); await page.waitForTimeout(50);
+    out.soundWhenMuted = (await page.evaluate(() => __trains.soundsPlayed)) - n0;
+    check('Settings sound toggle mutes every sound, and it survives a reload', /on/i.test(out.soundLabel) && /off/i.test(out.soundLabelOff) && out.soundWhenMuted === 0 && (await sw(page, 's1')).state === 1 - w.state && !(await page.evaluate(() => __trains.sound)), out);
+    out.level1 = await page.evaluate(() => ['kid', 'adult', 'expert'].map(d => { __trains.setDifficulty(d); return { d, ...__trains.cfg(1), l2: __trains.cfg(2).speed }; }));
+    check('level 1 is the same easy warm-up on every difficulty: 2 stations (one switch), 3 vehicles, slower than level 2',
+      out.level1.every(c => c.stations === 2 && c.trains === 3 && c.speed <= 0.08 + 1e-9 && c.speed < c.l2), out.level1);
+    await page.evaluate(() => __trains.start(1)); check('level 1 has exactly one switch', (await snap(page)).switches.length === 1);
+    // active route: follows the switches from the entry to a station, and moves when a switch moves
+    await page.evaluate(() => __trains.start(4));
+    const r0 = await page.evaluate(() => __trains.route); w = await sw(page, 's1'); await move(page, 'rail', w, 1 - w.state);
+    const r1 = await page.evaluate(() => __trains.route);
+    out.route = { r0, r1 };
+    check('the highlighted route runs entry → switches → a station and changes when a switch moves', r0.edges[0] === 'e>0' && r0.edges.length === 3 && /^[a-d]$/.test(r0.station) && r1.station !== r0.station, out.route);
     await ctx.close();
   }
 
@@ -240,7 +277,7 @@ const PHONES = {
 
   await Promise.all([
     ...Object.keys(PHONES).map(settings), rail('360x640'), rail('iPhone SE'), ...Object.keys(PHONES).map(lever), movement(),
-    ...MODES.map(m => hints(m, 'iPhone SE')), ...MODES.flatMap(m => ['iPhone SE', '360x640'].map(p => bot(m, p))),
+    ...MODES.map(m => hints(m, 'iPhone SE')), extras(), ...MODES.flatMap(m => ['iPhone SE', '360x640'].map(p => bot(m, p))),
   ]);
   check('no console errors', !errs.length, errs);
   const result = { ...summary, checks: { passed, failed }, errs, screenshots: SHOT, ok: !failed.length && !errs.length };
