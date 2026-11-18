@@ -82,8 +82,8 @@ const PHONES = {
     await page.waitForTimeout(150);
     const start = await page.evaluate(() => ({ theme: __trains.theme, header: document.querySelector('#title').textContent, title: document.querySelector('#startTitle').textContent,
       rules: [...document.querySelectorAll('#startOv .rule')].filter(p => !p.hidden).map(p => p.textContent).join(' '),
-      lit: [...document.querySelectorAll('#startOv .pick.on')].map(b => b.dataset.theme),
-      pickHeights: [...document.querySelectorAll('#startOv .pick')].map(b => Math.round(b.getBoundingClientRect().height)) }));
+      lit: [...document.querySelectorAll('#startOv .picker .pick.on')].map(b => b.dataset.theme),
+      pickHeights: [...document.querySelectorAll('#startOv .picker .pick')].map(b => Math.round(b.getBoundingClientRect().height)) }));
     check(`${theme}: picked on the start card and lit up`, start.theme === theme && start.lit.join() === theme, start);
     check(`${theme}: picker has a button per theme, each at least 64px tall`, start.pickHeights.length >= 3 && start.pickHeights.every(h => h >= 64), start.pickHeights);
     check(`${theme}: start card uses the theme's words`, start.header === words.title && start.title === words.title && start.rules.includes(words.one) && start.rules.includes(words.place), start);
@@ -106,20 +106,20 @@ const PHONES = {
       await page.screenshot({ path: SHOT + `tsw-${theme}-win.png` });
       out.winSub = await text(page, '#winSub'); out.bestPill = await text(page, '#bestPill');
       check(`${theme}: win card uses the theme's words`, out.winSub.includes(words.many) && out.winSub.includes(words.places), out.winSub);
-      check(`${theme}: best level saved`, out.bestPill === 'Best level 2', out.bestPill);
+      check(`${theme}: best level saved`, /Best 2$/.test(out.bestPill), out.bestPill);
       const wc = await card(page, '#winOv'); check(`${theme}: win card fits the screen`, wc.fits && !wc.smallButtons.length, wc);
       // change theme from the win card: only the look and words change, the best level and the level reached stay
       const other = REQUIRED.find(t => t !== theme), otherWords = await page.evaluate(t => THEMES[t], other);
       await page.locator('#winOv .themeOpen').tap(); await page.waitForSelector('#themeOv.show');
       await page.locator(`#themeOv .pick[data-theme="${other}"]`).tap(); await page.waitForTimeout(100);
       const swapped = { theme: await page.evaluate(() => __trains.theme), sub: await text(page, '#winSub'), pill: await text(page, '#bestPill'), phase: await page.evaluate(() => __trains.phase), level: await page.evaluate(() => __trains.level) };
-      check(`${theme}: theme can be changed on the win card without losing progress`, swapped.theme === other && swapped.sub.includes(otherWords.many) && swapped.pill === 'Best level 2' && swapped.phase === 'win' && swapped.level === 2, swapped);
+      check(`${theme}: theme can be changed on the win card without losing progress`, swapped.theme === other && swapped.sub.includes(otherWords.many) && /Best 2$/.test(swapped.pill) && swapped.phase === 'win' && swapped.level === 2, swapped);
       await page.locator(`#themeOv .pick[data-theme="${theme}"]`).tap(); await page.locator('#themeDone').tap();
       check(`${theme}: picker closes back to the win card`, !(await page.isVisible('#themeOv')) && await page.isVisible('#winOv'));
       // reload: the theme and the best level are remembered
       await page.reload(); await page.waitForTimeout(200);
       out.afterReload = { theme: await page.evaluate(() => __trains.theme), header: await text(page, '#title'), bestPill: await text(page, '#bestPill') };
-      check(`${theme}: theme and best level survive a reload`, out.afterReload.theme === theme && out.afterReload.header === words.title && out.afterReload.bestPill === 'Best level 2', out.afterReload);
+      check(`${theme}: theme and best level survive a reload`, out.afterReload.theme === theme && out.afterReload.header === words.title && /Best 2$/.test(out.afterReload.bestPill), out.afterReload);
     }
     await ctx.close();
   }
@@ -195,7 +195,7 @@ const PHONES = {
     Object.assign(summary.pause, { movesAgain: d2 !== d1, phase: await page.evaluate(() => __trains.phase), level: await page.evaluate(() => __trains.level) });
     check('header theme button pauses play, changes theme and resumes', summary.pause.paused && summary.pause.stoodStill && summary.pause.theme === 'boats' && summary.pause.movesAgain && summary.pause.phase === 'play' && summary.pause.level === 1 && pc.fits && !pc.smallButtons.length, { ...summary.pause, pc });
 
-    // default rule (kids): tapping a busy switch does nothing; it shakes and stays put, nothing crashes
+    // default difficulty (Kid): tapping a busy switch does nothing; it shakes and stays put, nothing crashes
     await page.evaluate(() => { __trains.setTheme('trains'); __trains.start(1); });
     const safeRuleShown = await page.evaluate(() => !document.querySelector('#ruleSafe').hidden && document.querySelector('#ruleCrash').hidden);
     const busy = await waitBusy(page);
@@ -203,34 +203,51 @@ const PHONES = {
       await page.touchscreen.tap(busy.x + 55, busy.y);
       await page.waitForTimeout(120); await page.screenshot({ path: SHOT + 'tsw-gentle-refused.png' });
       const after = (await snap(page)).switches[0];
-      summary.busyFlip.gentle = { constant: await page.evaluate(() => CRASH_ON_BUSY_FLIP), safeRuleShown, phase: await page.evaluate(() => __trains.phase), stateKept: after.state === busy.state };
-      check('default CRASH_ON_BUSY_FLIP = false: a busy switch refuses to flip and nothing crashes',
-        summary.busyFlip.gentle.constant === false && safeRuleShown && summary.busyFlip.gentle.phase === 'play' && summary.busyFlip.gentle.stateKept, summary.busyFlip.gentle);
+      summary.busyFlip.gentle = { difficulty: await page.evaluate(() => __trains.difficulty), crash: await page.evaluate(() => __trains.crash), safeRuleShown, phase: await page.evaluate(() => __trains.phase), stateKept: after.state === busy.state };
+      check('default difficulty is Kid with no crashes: a busy switch refuses to flip',
+        summary.busyFlip.gentle.difficulty === 'kid' && summary.busyFlip.gentle.crash === false && safeRuleShown && summary.busyFlip.gentle.phase === 'play' && summary.busyFlip.gentle.stateKept, summary.busyFlip.gentle);
     }
     await ctx.close();
   }
 
-  // ---------- 4. the crash rule: a copy of the game with CRASH_ON_BUSY_FLIP = true ----------
+  // ---------- 4. difficulty and speed: Expert crashes, levels scale, speed changes mid-level, bests kept per difficulty ----------
   async function crashRule() {
-    const src = fs.readFileSync(FILE, 'utf8'), copy = SHOT + 'tsw-crash-copy.html';
-    const edited = src.replace(/const CRASH_ON_BUSY_FLIP(\s*)= false;/, 'const CRASH_ON_BUSY_FLIP$1= true;');
-    if (!check('CRASH_ON_BUSY_FLIP constant found in the game file', edited !== src)) return;
-    fs.writeFileSync(copy, edited);
-    const { page, ctx } = await open('360x640', copy);
+    const { page, ctx } = await open('360x640');
+    const D = await page.evaluate(() => ({ kid: (__trains.setDifficulty('kid'), __trains.cfg(1)), adult: (__trains.setDifficulty('adult'), __trains.cfg(1)), expert: (__trains.setDifficulty('expert'), __trains.cfg(1)) }));
+    summary.difficulty = D;
+    check('Kid is slower and gentler than Adult, Adult than Expert', D.kid.speed < D.adult.speed && D.adult.speed < D.expert.speed && D.kid.gap > D.adult.gap && D.adult.gap > D.expert.gap && D.kid.trains <= D.adult.trains && D.adult.trains <= D.expert.trains, D);
     const crashRuleShown = await page.evaluate(() => document.querySelector('#ruleSafe').hidden && !document.querySelector('#ruleCrash').hidden);
     await page.evaluate(() => __trains.start(1));
     const busy = await waitBusy(page);
-    if (check('crash rule: a vehicle reaches the switch', !!busy)) {
+    if (check('Expert: a vehicle reaches the switch', !!busy)) {
       await page.touchscreen.tap(busy.x + 55, busy.y);
       await page.waitForTimeout(250); await page.screenshot({ path: SHOT + 'tsw-crash-moment.png' });
       await page.waitForSelector('#failOv.show', { timeout: 4000 }).catch(() => {});
       await page.waitForTimeout(200); await page.screenshot({ path: SHOT + 'tsw-crash-card.png' });
       summary.busyFlip.crash = { crashRuleShown, phase: await page.evaluate(() => __trains.phase), title: await text(page, '#failTitle') };
       const want = await page.evaluate(() => THEMES.trains.crashTitle), fc = await card(page, '#failOv');
-      check('CRASH_ON_BUSY_FLIP = true: a busy switch crashes', crashRuleShown && summary.busyFlip.crash.phase === 'fail' && summary.busyFlip.crash.title === want && await page.isVisible('#failOv'), summary.busyFlip.crash);
+      check('Expert: tapping a busy switch crashes', crashRuleShown && summary.busyFlip.crash.phase === 'fail' && summary.busyFlip.crash.title === want && await page.isVisible('#failOv'), summary.busyFlip.crash);
       check('fail card fits the screen', fc.fits && !fc.smallButtons.length, fc);
     }
-    await ctx.close(); fs.unlinkSync(copy);
+    // speed: changes straight away mid-level, no restart
+    await page.evaluate(() => { __trains.setSpeed('normal'); __trains.start(2); });
+    await page.waitForTimeout(1500);
+    const sp = await page.evaluate(() => { const n = __trains.cfg(2).speed; __trains.setSpeed('slow'); const s = __trains.cfg(2).speed; __trains.setSpeed('fast'); const f = __trains.cfg(2).speed;
+      return { normal: n, slow: s, fast: f, phase: __trains.phase, level: __trains.level, spacingSame: Math.abs(__trains.cfg(2).speed * __trains.cfg(2).gap - n * __trains.cfg(2).gap * 1.3 / 1.3) >= 0 }; });
+    summary.speed = sp;
+    check('speed option: slow < normal < fast, applied mid-level without a restart', sp.slow < sp.normal && sp.normal < sp.fast && sp.phase === 'play' && sp.level === 2, sp);
+    // bests are kept per difficulty, and the picker shows all three rows
+    await page.evaluate(() => { localStorage.setItem('trainswitcher.v1', JSON.stringify({ bests: { kid: 7, expert: 2 } })); });
+    await page.reload(); await page.waitForTimeout(200);
+    const pills = await page.evaluate(() => { const out = {}; for (const d of ['kid', 'adult', 'expert']) { __trains.setDifficulty(d); out[d] = document.getElementById('bestPill').textContent; } return out; });
+    summary.bests = pills;
+    check('each difficulty keeps its own best', /7/.test(pills.kid) && /0/.test(pills.adult) && /2/.test(pills.expert), pills);
+    await page.evaluate(() => { localStorage.setItem('trainswitcher.v1', JSON.stringify({ best: 5 })); }); await page.reload(); await page.waitForTimeout(200);
+    const migrated = await page.evaluate(() => { __trains.setDifficulty('adult'); return document.getElementById('bestPill').textContent; });
+    check('an old saved best shows under Adult', /5/.test(migrated), migrated);
+    const rows = await page.evaluate(() => ({ themes: document.querySelectorAll('#startOv .picker .pick').length, diffs: document.querySelectorAll('#startOv .dpicker:not(.spicker) .pick').length, speeds: document.querySelectorAll('#startOv .spicker .pick').length }));
+    check('start card has theme, difficulty and speed pickers', rows.themes === 3 && rows.diffs === 3 && rows.speeds === 3, rows);
+    await ctx.close();
   }
 
   await Promise.all([...REQUIRED.map(playTheme), phone('360x640', '360x640', true), phone('iPhone SE', 'iphone-se', true), tapZone(), crashRule()]);

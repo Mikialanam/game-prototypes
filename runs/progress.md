@@ -100,3 +100,4 @@ Working branch: `claude/awesome-sagan-qgefe9`, kept rebased on the GitHub Pages 
 - `tools/smoke-test-2.js train-switcher`: its 40ms polling bot sometimes misroutes at level 4, on the old game too. Use `smoke-train-switcher.js` instead, or slow the old bot.
 - City Builder friends' visits and trading: structure only.
 - 06:17 Miki asked: Train Switcher `CRASH_ON_BUSY_FLIP` set to false for the kids (busy switch shakes, no crash). Tests updated to match (`smoke-train-switcher.js`: 68 checks pass; `smoke-test-2.js train-switcher` skips the forced crash when crashes are off). Published to Pages.
+- 07:36 Miki asked: Train Switcher difficulty picker (Kid / Adult / Expert, own best level each; crash rule now part of difficulty, only Expert crashes) and a speed option (Slow / Normal / Fast, changes mid-level). `smoke-train-switcher.js` 72 checks pass; `smoke-test-2.js train-switcher` passes. Start card checked on iPhone SE and iPhone 13.

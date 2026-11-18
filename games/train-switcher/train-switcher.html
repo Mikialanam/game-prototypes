@@ -45,6 +45,11 @@
     background: rgba(255,255,255,.09); color: var(--muted); font-size: 16px; font-weight: 800;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
   .pick .e { font-size: 32px; line-height: 1; }
+  .dpicker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 4px 0 8px; }
+  .dpicker .pick { min-height: 56px; flex-direction: row; gap: 5px; padding: 6px 2px; white-space: nowrap; }
+  @media (max-width: 340px) { .dpicker .pick { font-size: 14px; gap: 3px; } .dpicker .pick .e { font-size: 18px !important; } }
+  .dpicker .pick .e { font-size: 22px; }
+  .plabel { font-size: 13px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin: 10px 0 2px; text-align: left; }
   .pick:active { transform: scale(.96); }
   .pick.on { background: #ffffff; color: #1b2a22; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255,204,51,.35); }
   .pick.on::after { content: '✓'; position: absolute; top: -9px; right: -7px; width: 24px; height: 24px; border-radius: 50%;
@@ -54,11 +59,18 @@
     .card { padding: 16px 16px; } .card h2 { font-size: 24px; } .emoji { font-size: 40px; }
     .rule { font-size: 16px; margin: 6px 0; } .pick { min-height: 72px; } button.btn { margin-top: 8px; }
   }
+  /* short phones: the start card holds three pickers, so drop the big emoji and tighten it up */
+  @media (max-height: 700px) {
+    #startOv .emoji { display: none; } .card { padding: 14px 14px; } .card h2 { font-size: 22px; margin-bottom: 4px; }
+    .picker { margin: 6px 0 4px; } .picker .pick { min-height: 64px; gap: 2px; } .picker .pick .e { font-size: 26px; }
+    .dpicker { margin: 2px 0 4px; } .dpicker .pick { min-height: 48px; } .plabel { margin: 6px 0 2px; font-size: 12px; }
+    .rule { font-size: 15px; line-height: 1.3; margin: 5px 0; } button.btn { min-height: 56px; margin-top: 8px; }
+  }
 </style>
 </head>
 <body>
 <header>
-  <button class="themebtn" id="themeBtn" aria-label="Change theme">🚂</button>
+  <button class="themebtn" id="themeBtn" aria-label="Change theme, difficulty or speed">🚂</button>
   <h1 id="title">Train Switcher</h1>
   <div class="pill" id="bestPill">Best level 0</div>
 </header>
@@ -71,6 +83,10 @@
     <div class="emoji" id="startEmoji">🚂</div>
     <h2 id="startTitle">Train Switcher</h2>
     <div class="picker"></div>
+    <p class="plabel">Who's playing?</p>
+    <div class="dpicker"></div>
+    <p class="plabel">Speed</p>
+    <div class="dpicker spicker"></div>
     <p class="rule"><b>Tap a big arrow</b> to send each <span data-w="one">train</span> to the <span data-w="place">station</span> of <b>its colour</b>.</p>
     <p class="rule" id="ruleCrash">Don't tap an arrow while a <span data-w="one">train</span> is <b style="color:var(--bad)">on it</b>, <span data-w="oops">or it crashes</span>.</p>
     <p class="rule" id="ruleSafe" hidden>An arrow won't turn while a <span data-w="one">train</span> is <b style="color:var(--bad)">on it</b>. Wait for it to pass.</p>
@@ -103,9 +119,13 @@
 
 <div class="overlay top" id="themeOv">
   <div class="card">
-    <h2>Pick a theme</h2>
+    <h2>Theme, difficulty, speed</h2>
     <div class="picker"></div>
-    <p class="sub">Same game, new look. Your best level is kept.</p>
+    <p class="plabel">Who's playing?</p>
+    <div class="dpicker"></div>
+    <p class="plabel">Speed</p>
+    <div class="dpicker spicker"></div>
+    <p class="sub" id="themeNote">Speed changes straight away. A new difficulty starts again at level 1 and keeps its own best level.</p>
     <button class="btn" id="themeDone">Done</button>
   </div>
 </div>
@@ -134,7 +154,24 @@ const SWITCH_SIZE_MAX        = 104;  // px: a switch button is never wider than 
 const SWITCH_GAP             = 14;   // px always kept clear between a switch button and other switches, stations and the top edge
 const ARROW_MIN_TILT         = 35;   // degrees: the arrow leans at least this far left or right so the way is easy to read (0 = exactly along the path)
 const TAP_RADIUS             = 100;  // px: a tap this close to a switch flips it, and the nearest switch wins (it shrinks only if it would reach a station)
-const CRASH_ON_BUSY_FLIP     = false; // true: tapping a switch with a vehicle on it crashes. false: the switch only shakes and stays put
+// Difficulty: the same levels underneath, scaled. Each difficulty keeps its own best level.
+//   speed, gap: multiply every level's speed and the time between vehicles.   trains: added to every level's count (never below MIN_TRAINS).
+//   crash: true = tapping a switch with a vehicle on it crashes; false = the switch only shakes and stays put.
+const DIFFICULTIES = {
+  kid:    { emoji: '🧸', label: 'Kid',    speed: 0.60, gap: 1.60, trains: -2, crash: false },
+  adult:  { emoji: '🙂', label: 'Adult',  speed: 0.80, gap: 1.25, trains: -1, crash: false },
+  expert: { emoji: '🔥', label: 'Expert', speed: 1.10, gap: 0.90, trains: 0,  crash: true },
+};
+// Speed: works on top of any difficulty and can be changed at any time, even mid-level. speed multiplies how fast vehicles move;
+// the time between them stretches to match, so they stay the same distance apart on the track.
+const SPEEDS = {
+  slow:   { emoji: '🐢', label: 'Slow',   speed: 0.70 },
+  normal: { emoji: '▶️', label: 'Normal', speed: 1.00 },
+  fast:   { emoji: '🐇', label: 'Fast',   speed: 1.30 },
+};
+const DEFAULT_SPEED          = 'normal';
+const DEFAULT_DIFFICULTY     = 'kid'; // difficulty the first time the game is opened (after that the player's pick is saved)
+const MIN_TRAINS             = 3;     // a level never has fewer vehicles than this
 const COLOURS = ['#ff5d5d', '#4da3ff', '#ffcc33', '#b46bff']; // red, blue, yellow, purple: the same in every theme, because matching colours is the game
 const DEFAULT_THEME          = 'trains'; // theme shown the first time the game is opened (after that the player's pick is saved)
 // One row per theme. A theme only changes the look and the words; the levels, speeds and rules stay the same.
@@ -195,17 +232,27 @@ const SOUND_ON               = true;
          a: [.11, .86], b: [.39, .86], c: [.61, .86], d: [.89, .86] },
   };
 
-  function levelCfg(n) { // n is 1-based
+  function baseCfg(n) { // n is 1-based
     if (n <= LEVELS.length) return LEVELS[n - 1];
     const L = LEVELS[LEVELS.length - 1], k = n - LEVELS.length;
     return { stations: L.stations, trains: L.trains + k * EXTRA_TRAINS_PER_LEVEL,
       speed: L.speed * Math.pow(EXTRA_SPEED_PER_LEVEL, k), gap: Math.max(MIN_GAP, L.gap * Math.pow(EXTRA_GAP_PER_LEVEL, k)) };
+  }
+  function levelCfg(n) { // the level as the chosen difficulty plays it
+    const b = baseCfg(n);
+    return { stations: b.stations, trains: Math.max(MIN_TRAINS, b.trains + D.trains), speed: b.speed * D.speed * SP.speed, gap: Math.max(MIN_GAP, b.gap * D.gap) / SP.speed };
   }
 
   // ---------- state ----------
   let phase = 'menu', level = 1, cfg, nodes, switches, trains, spawned, delivered, spawnT, last, crashAt, flashes;
   let paused = false, clock = 0, ripples = [], decor = [], card = null;  // card: what the win / fail card is showing
   let swR = 40, tapR = TAP_RADIUS, stS = 1;                              // switch radius, tap reach, station scale: worked out from the screen
+  // best levels are kept per difficulty; a best from before difficulties existed counts as Adult
+  (() => { const s = load(); if (s.best && !s.bests) { s.bests = { adult: s.best }; save(s); } })();
+  let diffName = DIFFICULTIES[load().difficulty] ? load().difficulty : DIFFICULTIES[DEFAULT_DIFFICULTY] ? DEFAULT_DIFFICULTY : Object.keys(DIFFICULTIES)[0], D = DIFFICULTIES[diffName];
+  let diffChangedInPlay = false;
+  let speedName = SPEEDS[load().speed] ? load().speed : SPEEDS[DEFAULT_SPEED] ? DEFAULT_SPEED : 'normal', SP = SPEEDS[speedName] || { speed: 1 };
+  const bestOf = () => (load().bests || {})[diffName] || 0;
   let themeName = THEMES[load().theme] ? load().theme : THEMES[DEFAULT_THEME] ? DEFAULT_THEME : Object.keys(THEMES)[0], T = THEMES[themeName];
   const cv = $('cv'), ctx = cv.getContext('2d'); let W = 0, H = 0;
   const P = id => ({ x: nodes[id].x * W, y: nodes[id].y * H });
@@ -296,7 +343,7 @@ const SOUND_ON               = true;
   function flip(sw) {
     if (phase !== 'play') return;
     if (occupied(sw)) {
-      if (CRASH_ON_BUSY_FLIP) { const p = P(sw.id); crash(p.x, p.y); }
+      if (D.crash) { const p = P(sw.id); crash(p.x, p.y); }
       else { sw.shake = 1; beep(130, .14, 'square', .07); buzz([25, 30, 25]); }   // gentle rule: it shakes, says no, and stays put
       return;
     }
@@ -314,7 +361,7 @@ const SOUND_ON               = true;
   function fail(kind) { card = { kind }; renderCard(); $('failOv').classList.add('show'); }
   function win() {
     phase = 'win';
-    const s = load(); const isBest = level > (s.best || 0); if (isBest) s.best = level; save(s); updatePill();
+    const s = load(); s.bests = s.bests || {}; const isBest = level > (s.bests[diffName] || 0); if (isBest) s.bests[diffName] = level; save(s); updatePill();
     card = { kind: 'win', isBest }; renderCard();
     const nb = $('winNew'); nb.classList.remove('pop'); void nb.offsetWidth; if (isBest) nb.classList.add('pop');
     setTimeout(() => { $('winOv').classList.add('show'); confetti(); [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, .18), i * 80)); }, 500);
@@ -332,10 +379,10 @@ const SOUND_ON               = true;
       $('failEmoji').textContent = crashed ? T.crashEmoji : '😬';
       $('failTitle').textContent = crashed ? T.crashTitle : `Wrong ${T.place}!`;
       $('failWhy').textContent = crashed ? `An arrow was tapped while a ${T.one} was on it.` : `Each ${T.one} must reach the ${T.place} of its own colour.`;
-      $('failBest').textContent = `Level ${level} · best level cleared: ${load().best || 0}`;
+      $('failBest').textContent = `Level ${level} · best level cleared (${D.label}): ${bestOf()}`;
     }
   }
-  const updatePill = () => $('bestPill').textContent = 'Best level ' + (load().best || 0);
+  const updatePill = () => $('bestPill').textContent = `${D.emoji} Best ${bestOf()}`;
 
   // ---------- themes ----------
   function setTheme(name, remember = true) {
@@ -348,16 +395,55 @@ const SOUND_ON               = true;
     $('title').textContent = T.title; $('themeBtn').textContent = T.emoji;
     $('startEmoji').textContent = T.emoji; $('startTitle').textContent = T.title;
     document.querySelectorAll('[data-w]').forEach(el => el.textContent = T[el.dataset.w]);
-    document.querySelectorAll('.pick').forEach(b => { const on = b.dataset.theme === name; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+    document.querySelectorAll('.picker .pick').forEach(b => { const on = b.dataset.theme === name; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
     renderCard(); if (cfg) updateBar();
     return true;
   }
   function openThemes() {
     paused = phase === 'play';                                   // the game waits while the picker is open
+    diffChangedInPlay = false;
     $('themeDone').textContent = paused ? 'Keep playing' : 'Done';
     $('themeOv').classList.add('show');
   }
-  function closeThemes() { $('themeOv').classList.remove('show'); paused = false; }
+  function closeThemes() {
+    $('themeOv').classList.remove('show'); paused = false;
+    if (diffChangedInPlay) { diffChangedInPlay = false; start(1); }   // a new difficulty starts again from level 1
+  }
+  // ---------- difficulty ----------
+  function setDifficulty(name, remember = true) {
+    if (!DIFFICULTIES[name]) return false;
+    const changed = name !== diffName;
+    diffName = name; D = DIFFICULTIES[name];
+    if (remember) { const s = load(); s.difficulty = name; save(s); }
+    document.querySelectorAll('.dpicker .pick').forEach(b => { const on = b.dataset.diff === name; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+    $('ruleCrash').hidden = !D.crash; $('ruleSafe').hidden = D.crash;
+    if (changed && paused && phase === 'play') { diffChangedInPlay = true; $('themeDone').textContent = 'Start again at level 1'; }
+    updatePill(); if (cfg && phase !== 'play') { cfg = levelCfg(level); renderCard(); }
+    return true;
+  }
+  // ---------- speed: applies straight away, even mid-level ----------
+  function setSpeed(name, remember = true) {
+    if (!SPEEDS[name]) return false;
+    speedName = name; SP = SPEEDS[name];
+    if (remember) { const s = load(); s.speed = name; save(s); }
+    document.querySelectorAll('.spicker .pick').forEach(b => { const on = b.dataset.speed === name; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+    if (cfg) { cfg = levelCfg(level); if (spawnT > cfg.gap) spawnT = cfg.gap; renderCard(); }
+    return true;
+  }
+  document.querySelectorAll('.spicker').forEach(box => {
+    for (const key in SPEEDS) {
+      const b = document.createElement('button'), e = document.createElement('span'), l = document.createElement('span');
+      b.type = 'button'; b.className = 'pick'; b.dataset.speed = key; e.className = 'e'; e.textContent = SPEEDS[key].emoji; l.textContent = SPEEDS[key].label;
+      b.append(e, l); b.addEventListener('click', () => { setSpeed(key); beep(480, .06); buzz(6); }); box.appendChild(b);
+    }
+  });
+  document.querySelectorAll('.dpicker:not(.spicker)').forEach(box => {
+    for (const key in DIFFICULTIES) {
+      const b = document.createElement('button'), e = document.createElement('span'), l = document.createElement('span');
+      b.type = 'button'; b.className = 'pick'; b.dataset.diff = key; e.className = 'e'; e.textContent = DIFFICULTIES[key].emoji; l.textContent = DIFFICULTIES[key].label;
+      b.append(e, l); b.addEventListener('click', () => { setDifficulty(key); beep(440, .06); buzz(6); }); box.appendChild(b);
+    }
+  });
   document.querySelectorAll('.picker').forEach(box => {
     for (const key in THEMES) {
       const b = document.createElement('button'), e = document.createElement('span'), l = document.createElement('span');
@@ -365,8 +451,7 @@ const SOUND_ON               = true;
       b.append(e, l); b.addEventListener('click', () => { setTheme(key); beep(520, .06); buzz(6); }); box.appendChild(b);
     }
   });
-  document.querySelectorAll('.themeOpen').forEach(b => { b.textContent = 'Change theme ' + Object.values(THEMES).map(t => t.emoji).join(' '); b.addEventListener('click', openThemes); });
-  $('ruleCrash').hidden = !CRASH_ON_BUSY_FLIP; $('ruleSafe').hidden = CRASH_ON_BUSY_FLIP;
+  document.querySelectorAll('.themeOpen').forEach(b => { b.textContent = 'Theme, difficulty or speed'; b.addEventListener('click', openThemes); });
 
   // ---------- loop ----------
   function frame(now) {
@@ -622,6 +707,7 @@ const SOUND_ON               = true;
   // test hook (a peek for the automated smoke tests; setTheme and start are for tests only)
   window.__trains = { get phase() { return phase; }, get level() { return level; },
     get theme() { return themeName; }, setTheme(name) { return setTheme(name); },
+    get difficulty() { return diffName; }, setDifficulty(name) { return setDifficulty(name); }, get crash() { return D.crash; }, get speed() { return speedName; }, setSpeed(name) { return setSpeed(name); }, cfg(n) { return levelCfg(n); },
     get paused() { return paused; }, start(n) { start(Math.max(1, n | 0)); },
     layout() {   // sizes the layout test checks: switch buttons, tap reach and the boxes the stations fill
       const stage = cv.getBoundingClientRect();
@@ -638,7 +724,7 @@ const SOUND_ON               = true;
           return [c, s.next.findIndex(reaches)]; }))])) };
     } };
 
-  resize(); buildLevel(); setTheme(themeName, false); updatePill(); requestAnimationFrame(frame);
+  resize(); buildLevel(); setTheme(themeName, false); setDifficulty(diffName, false); setSpeed(speedName, false); updatePill(); requestAnimationFrame(frame);
 })();
 </script>
 </body>

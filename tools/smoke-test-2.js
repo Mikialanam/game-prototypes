@@ -150,8 +150,8 @@ const want = n => !only.length || only.includes(n);
       if (L === 3) await page.waitForTimeout(3000), await page.screenshot({ path: SHOT + 'ts-play.png' });
     }
     // force a crash: flip a switch while a train is on it (skipped when the game has crashes switched off)
-    const crashesOn = await page.evaluate(() => typeof CRASH_ON_BUSY_FLIP === 'undefined' || CRASH_ON_BUSY_FLIP);
-    let crashed = !crashesOn, crashTitle = 'skipped: CRASH_ON_BUSY_FLIP is false';
+    const crashesOn = await page.evaluate(() => typeof __trains.crash === 'boolean' ? __trains.crash : true);
+    let crashed = !crashesOn, crashTitle = 'skipped: this difficulty has no crashes';
     for (let i = 0; i < 400 && !crashed; i++) {
       const s = await snap(); const busy = s.switches.find(w => w.busy);
       if (busy) { await page.mouse.click(busy.x, busy.y); crashed = true; } else await page.waitForTimeout(30);
