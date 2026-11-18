@@ -16,7 +16,7 @@ Stay on scope: only Train Switcher.
 | 4 | Active route highlight: glow the whole path from the entry to the station a train would reach now, and light that station | 20 min | done |
 | 5 | Tutorial: the hand demonstrates one flip (the track moves), then hands over to the player and disappears after their flip | 25 min | done |
 | 6 | Tests: extend `smoke-train-controls.js`; rerun both Train Switcher tests and the home-page/other-game smoke test; check screenshots | 25 min | done |
-| 7 | README, handover, check the live link | 10 min | |
+| 7 | README, handover, check the live link | 10 min | done |
 
 ## Later (not this run)
 - Playtest with the same child (table in RATING-SHEET.md).
@@ -28,6 +28,14 @@ Stay on scope: only Train Switcher.
 - 23:32 Active route: the whole path a vehicle would take right now (entry, every set branch on the way, its station) glows brightly and pulses, the station gets a halo; set branches off the route glow faintly. Checked in all three themes on level 4. Next: demo tutorial.
 - 23:50 Tutorial is now a demo, as the brief says: on level 1 one 👆 glides in (0.5s), hovers on the branch / lever / arrow, taps or pushes, the switch really flips (clack, glow, route moves to the first vehicle's station), then the hand lifts and fades by 3.7s; the first vehicle appears as it leaves. Tapping a switch during the demo stops it. It replays on level 1 until level 1 is won once in that mode (so a child who crashed sees it again). Constants `TUTORIAL`, `HINT_WAIT`. Also fixed two constant comments an earlier edit had moved. Next: tests.
 - 00:05 `smoke-train-controls.js` 91/91 (tutorial demo flips onto the first vehicle's route by itself then disappears, a player's flip during it wins, not shown again once level 1 is won, Sound toggle mutes everything and is saved, level 1 is the same warm-up on every difficulty, route highlight follows the switches). `smoke-train-switcher.js` 72/72 twice: its Expert crash check tapped beside the switch, which only sometimes lands on a branch in Tap-the-rail mode, so it now pins Arrow mode. Home page: 12/12 links load with no console errors. Only Train Switcher files and its tests changed. Next: README, live check.
+- 00:12 README updated (route highlight, clack, Sound toggle, easy level 1, demo tutorial, new constants). Pushed to Pages.
+
+## Handover (round 2)
+**Done:** everything in the brief. Settings (⚙️ on start and pause cards): Switch controls (Tap the rail default, Lever, Arrow unchanged) and Sound on/off, both saved. Flips: track swings + clack. Active route glows to its station. Level 1 easy on every difficulty. Tutorial hand demonstrates one flip on level 1 then disappears. Tests: `smoke-train-controls.js` 91/91, `smoke-train-switcher.js` 72/72; home page links 12/12 clean.
+
+**Blocked:** none.
+
+**Choices to revisit after the playtest:** the tutorial replays on level 1 until level 1 is won in that mode (a child who crashes sees it again); a player's own flip stops the demo; Lever mode ignores taps on the track; level 1 ignores difficulty (Speed still applies).
 
 ---
 
