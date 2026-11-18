@@ -219,7 +219,8 @@ const PHONES = {
   // ---------- 4. difficulty and speed: Expert crashes, levels scale, speed changes mid-level, bests kept per difficulty ----------
   async function crashRule() {
     const { page, ctx } = await open('360x640');
-    const D = await page.evaluate(() => ({ kid: (__trains.setDifficulty('kid'), __trains.cfg(1)), adult: (__trains.setDifficulty('adult'), __trains.cfg(1)), expert: (__trains.setDifficulty('expert'), __trains.cfg(1)) }));
+    // level 2: level 1 is the same easy warm-up on every difficulty
+    const D = await page.evaluate(() => ({ kid: (__trains.setDifficulty('kid'), __trains.cfg(2)), adult: (__trains.setDifficulty('adult'), __trains.cfg(2)), expert: (__trains.setDifficulty('expert'), __trains.cfg(2)) }));
     summary.difficulty = D;
     check('Kid is slower and gentler than Adult, Adult than Expert', D.kid.speed < D.adult.speed && D.adult.speed < D.expert.speed && D.kid.gap > D.adult.gap && D.adult.gap > D.expert.gap && D.kid.trains <= D.adult.trains && D.adult.trains <= D.expert.trains, D);
     const crashRuleShown = await page.evaluate(() => document.querySelector('#ruleSafe').hidden && !document.querySelector('#ruleCrash').hidden);

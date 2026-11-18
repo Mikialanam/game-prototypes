@@ -175,6 +175,9 @@ const LEVELS = [
   { stations: 4, trains: 12, speed: 0.20, gap: 1.8 },
   { stations: 4, trains: 14, speed: 0.22, gap: 1.6 },
 ];
+// Level 1 is the same gentle warm-up on every difficulty: one switch, two stations, few vehicles, slow, wide gaps.
+// (The Speed setting still applies on top.) Set FIRST_LEVEL = null to play level 1 from the table like any other level.
+const FIRST_LEVEL            = { trains: 3, speed: 0.08, gap: 4.5 };
 const EXTRA_TRAINS_PER_LEVEL = 2;    // after the table runs out: trains added per level
 const EXTRA_SPEED_PER_LEVEL  = 1.06; // ...speed multiplier per level
 const EXTRA_GAP_PER_LEVEL    = 0.94; // ...gap multiplier per level
@@ -306,6 +309,7 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
   }
   function levelCfg(n) { // the level as the chosen difficulty plays it
     const b = baseCfg(n);
+    if (n === 1 && FIRST_LEVEL) return { stations: 2, trains: FIRST_LEVEL.trains, speed: Math.min(b.speed * D.speed, FIRST_LEVEL.speed) * SP.speed, gap: Math.max(b.gap * D.gap, FIRST_LEVEL.gap) / SP.speed };
     return { stations: b.stations, trains: Math.max(MIN_TRAINS, b.trains + D.trains), speed: b.speed * D.speed * SP.speed, gap: Math.max(MIN_GAP, b.gap * D.gap) / SP.speed };
   }
 
