@@ -14,7 +14,7 @@ Stay on scope: only Train Switcher controls this run.
 | 2 | Settings screen: gear on start card and pause menu, three-mode picker, saved mode, "show hints again" | 25 min | done |
 | 3 | Shared switch visuals: animated points that visibly swing, active branch glow; Tap-the-rail mode with big forgiving branch targets | 30 min | done |
 | 4 | Lever mode: chunky lever beside each switch, placed clear of track and stations, tap or drag to flip, link rod to the points | 30 min | done |
-| 5 | First-time hints (pulsing hand + one-line caption) on level 1, per mode; first vehicle waits a moment | 20 min | |
+| 5 | First-time hints (pulsing hand + one-line caption) on level 1, per mode; first vehicle waits a moment | 20 min | done |
 | 6 | Smoke test `tools/smoke-train-controls.js` (all modes, phones, hints, saving); keep existing tests passing; check screenshots | 30 min | |
 | 7 | README, home page text, RATING-SHEET / RUN-LOG note; final report | 15 min | |
 
@@ -27,6 +27,7 @@ Stay on scope: only Train Switcher controls this run.
 - 21:25 Settings screen done: gear on the start card and the pause card (the header button's card, now titled "Paused" during play). Mode saved as `controls` in the existing save. Checked on iPhone SE. Next: rail mode and moving points.
 - 21:40 Rail mode done: each branch owns a band 56px either side of its centre line (nearest wins; a station counts as part of its branch); the switch is a white piece of track that swings across in 0.3s; the set branch glows and the other is dimmed; a tapped branch flashes. Arrow mode keeps its arrow and buffer stops, and gains the glow and the slower visible turn. All 12 branch taps on level 4 land on the right switch. Next: lever mode.
 - 21:58 Lever mode done: each lever is placed automatically in the clearest spot beside its switch (checked on iPhone SE, iPhone 13, 360x640 for 2-, 3- and 4-station levels: no overlaps); it leans the way the track goes, lamps on the base light that side, a dashed rod joins it to its switch. Tap flips; sliding 14px towards the other side flips; sliding the way it already leans does nothing. Next: first-time hints.
+- 22:12 First-time hints done: on level 1 a pulsing 👆 shows the move (on the branch to tap, sliding the lever with a curved arrow, or on the arrow button) plus a one-line caption; the first vehicle waits 2.2s and the first switch starts the wrong way for it, so the hinted move is the right one. Once a switch moves, that mode's hint is saved as seen (`hints` in the save). Settings has "Show the first-time hint again" for the next child. Next: smoke test.
 
 ---
 

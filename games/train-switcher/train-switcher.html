@@ -67,6 +67,11 @@
   .cpicker .pick .e { font-size: 30px; flex: none; width: 38px; text-align: center; }
   .cpicker .pick small { display: block; font-size: 13px; font-weight: 600; opacity: .85; margin-top: 2px; }
   .cpicker .pick .tag { font-size: 11px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; opacity: .7; margin-left: 4px; }
+  /* first-time hint caption (level 1): the pulsing hand is drawn on the canvas */
+  #hint { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); max-width: calc(100% - 24px); width: max-content; pointer-events: none;
+    background: rgba(0,0,0,.62); color: #fff; border-radius: 999px; padding: 8px 16px; font-size: 17px; font-weight: 800; text-align: center;
+    opacity: 0; transition: opacity .3s; z-index: 2; }
+  #hint.show { opacity: 1; }
   #fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; }
   @media (max-height: 620px) {
     .card { padding: 16px 16px; } .card h2 { font-size: 24px; } .emoji { font-size: 40px; }
@@ -88,7 +93,7 @@
   <div class="pill" id="bestPill">Best level 0</div>
 </header>
 <div id="bar"><span id="lvl">Level 1</span><span id="count">0 / 0</span></div>
-<div id="stage"><canvas id="cv"></canvas></div>
+<div id="stage"><canvas id="cv"></canvas><div id="hint" aria-live="polite"></div></div>
 
 <!-- words marked data-w are filled in from the THEMES table (train / boat / plane, station / dock / airport) -->
 <div class="overlay show" id="startOv">
@@ -222,11 +227,11 @@ const THEMES = {
 // Switch controls (picked in Settings, saved on the device). Every mode moves the same switches; only the way you move them changes.
 //   rail: tap the branch of track you want; the switch swings onto it.   lever: push the lever beside each switch, like a toy train set.
 //   arrow: tap the big round arrow button (the original control).
-//   how: the start card's instruction.   hint: the first-time caption on level 1 ({one} = train / boat / plane).
+//   how: the start card's instruction.   hint: the first-time caption on level 1 (it may use {one} = train / boat / plane).
 const CONTROLS = {
-  rail:  { emoji: '👆', label: 'Tap the rail', tag: 'easiest', note: 'Tap the track you want. The switch moves onto it.', how: 'Tap the track you want', hint: 'Tap the track you want the {one} to take' },
-  lever: { emoji: '🕹️', label: 'Lever', tag: 'toy train set', note: 'Push the lever beside each switch, left or right.', how: 'Push a lever', hint: 'Push the lever to move the track' },
-  arrow: { emoji: '➡️', label: 'Arrow', tag: 'original', note: 'Tap the big arrow to turn it.', how: 'Tap a big arrow', hint: 'Tap the arrow to turn it' },
+  rail:  { emoji: '👆', label: 'Tap the rail', tag: 'easiest', note: 'Tap the track you want. The switch moves onto it.', how: 'Tap the track you want', hint: 'Tap the track you want' },
+  lever: { emoji: '🕹️', label: 'Lever', tag: 'toy train set', note: 'Push the lever beside each switch, left or right.', how: 'Push a lever', hint: 'Push the lever' },
+  arrow: { emoji: '➡️', label: 'Arrow', tag: 'original', note: 'Tap the big arrow to turn it.', how: 'Tap a big arrow', hint: 'Tap the arrow' },
 };
 const DEFAULT_CONTROLS       = 'rail';
 const SWITCH_MOVE_TIME       = 0.3;  // seconds a switch takes to swing across, so you can see what your tap did (all modes)
@@ -236,7 +241,8 @@ const POINTS_LEN             = 46;
 const LEVER_SIZE             = 1;    // lever scale (1 = base 50px wide, knob 26px across on a 360px-wide phone)
 const LEVER_TILT             = 34;   // degrees the lever leans left or right: it leans the way the track goes
 const LEVER_TAP_R            = 50;   // px: a tap or drag starting this close to a lever moves it (nearest lever wins)
-const LEVER_DRAG             = 14;   // px a finger must slide sideways to push the lever over   // px: length of the moving piece of track at each switch (rail and lever modes)
+const LEVER_DRAG             = 14;
+const HINT_WAIT              = 2.2;  // seconds the first vehicle waits on level 1 while the first-time hint shows   // px a finger must slide sideways to push the lever over   // px: length of the moving piece of track at each switch (rail and lever modes)
 const SOUND_ON               = true;
 // =====================================================
 
@@ -287,6 +293,7 @@ const SOUND_ON               = true;
 
   // ---------- state ----------
   let phase = 'menu', level = 1, cfg, nodes, switches, trains, spawned, delivered, spawnT, last, crashAt, flashes;
+  let hintOn = false, firstColour = null;                                // first-time hint (level 1 only, once per control mode)
   let gesture = null;                                                    // a finger held on a lever (lever mode)
   let paused = false, clock = 0, ripples = [], decor = [], card = null;  // card: what the win / fail card is showing
   let swR = 40, tapR = TAP_RADIUS, stS = 1;                              // switch radius, tap reach, station scale: worked out from the screen
@@ -383,9 +390,12 @@ const SOUND_ON               = true;
   }
   function updateBar() { $('lvl').textContent = 'Level ' + level; $('count').textContent = `${T.countIcon} ${delivered} / ${cfg.trains}`; }
 
+  // which branch of switch s leads to the station of this colour
+  function branchFor(s, colour) { const reaches = id => { const n = nodes[id]; return n.kind === 'station' ? n.colour === colour : n.next.some(reaches); }; return s.next.findIndex(reaches); }
   function spawn() {
     const stationIds = Object.keys(nodes).filter(k => nodes[k].kind === 'station');
-    const target = nodes[stationIds[Math.floor(Math.random() * stationIds.length)]];
+    let target = nodes[stationIds[Math.floor(Math.random() * stationIds.length)]];
+    if (spawned === 0 && firstColour) target = Object.values(nodes).find(n => n.kind === 'station' && n.colour === firstColour) || target;
     const first = nodes.e.next[0];
     trains.push({ colour: target.colour, route: ['e', first], cum: [0, dist('e', first)], d: 0 });
     spawned++;
@@ -404,8 +414,14 @@ const SOUND_ON               = true;
       const rel = t.d - t.cum[i]; return rel > -SWITCH_ZONE && rel < trainLen() + SWITCH_ZONE; });
   }
 
+  const hintSeen = () => !!(load().hints || {})[ctrlName];
   function start(n) {
-    level = n; buildLevel(); phase = 'play'; paused = false; card = null;
+    level = n; buildLevel(); phase = 'play'; paused = false; card = null; gesture = null;
+    hintOn = level === 1 && !hintSeen(); firstColour = null;
+    if (hintOn) {   // the first vehicle waits a moment, and the first switch starts the wrong way for it, so the hint shows a move that matters
+      const st = Object.values(nodes).filter(k => k.kind === 'station'), target = st[Math.floor(Math.random() * st.length)], s1 = nodes[nodes.e.next[0]];
+      firstColour = target.colour; s1.state = s1.anim = 1 - branchFor(s1, firstColour); spawnT = HINT_WAIT;
+    }
     ['startOv', 'winOv', 'failOv', 'themeOv'].forEach(id => $(id).classList.remove('show'));
   }
 
@@ -417,6 +433,7 @@ const SOUND_ON               = true;
       return;
     }
     sw.state = 1 - sw.state; sw.pulse = 1; beep(440, .05, 'square', .06); buzz(6);
+    if (hintOn) { hintOn = false; const s = load(); s.hints = s.hints || {}; s.hints[ctrlName] = true; save(s); }   // they've done it once: no more hint for this mode
   }
 
   // rail mode: the player tapped branch i of a switch. If it already goes that way, just say "yes, this way".
@@ -539,6 +556,7 @@ const SOUND_ON               = true;
     document.querySelectorAll('.cpicker .pick').forEach(b => { const on = b.dataset.ctrl === name; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
     $('howTo').textContent = C.how;
     if (nodes) measure();
+    if (phase === 'play' && level === 1) hintOn = !hintSeen();
     return true;
   }
   document.querySelectorAll('.cpicker').forEach(box => {
@@ -561,7 +579,7 @@ const SOUND_ON               = true;
   $('hintsAgain').addEventListener('click', () => { const s = load(); delete s.hints; save(s); resetHint();
     $('hintsAgain').textContent = 'Hints will show on level 1 ✓'; beep(600, .06); });
 
-  function resetHint() {}   // filled in with the first-time hints
+  function resetHint() { if (phase === 'play' && level === 1) hintOn = true; }
   // ---------- loop ----------
   function frame(now) {
     const dt = Math.min(.05, (now - (last || now)) / 1000); last = now; clock += dt;
@@ -798,6 +816,33 @@ const SOUND_ON               = true;
     ctx.restore();
     ctx.fillStyle = '#1d1d1d'; circle(x, y, 5 * k); ctx.fill();                                                                // pivot
   }
+  // first-time hint: where to put a finger for the move the next vehicle needs (null when the switch is already right)
+  function hintSpot() {
+    if (!hintOn || phase !== 'play') return null;
+    const s = nodes[nodes.e.next[0]], A = P(s.id);
+    const next = trains.filter(t => t.route[t.route.length - 1] === s.id).sort((a, b) => b.d - a.d)[0];
+    const colour = next ? next.colour : firstColour; if (!colour) return null;
+    const want = branchFor(s, colour); if (want < 0 || want === s.state) return null;
+    if (ctrlName === 'rail') { const B = P(s.next[want]), len = Math.hypot(B.x - A.x, B.y - A.y), k = Math.min(.45, 105 / len);
+      return { x: A.x + (B.x - A.x) * k, y: A.y + (B.y - A.y) * k, slide: 0 }; }
+    if (ctrlName === 'lever') return { x: s.lv.x, y: s.lv.y - leverR() * 1.1, slide: P(s.next[want]).x > P(s.next[s.state]).x ? 1 : -1 };
+    return { x: A.x + swR * .25, y: A.y + swR * .25, slide: 0 };
+  }
+  function drawHint() {
+    const h = hintSpot(), cap = $('hint');
+    cap.classList.toggle('show', !!h);
+    if (!h) return;
+    const txt = C.hint.replace('{one}', T.one); if (cap.textContent !== txt) cap.textContent = txt;
+    const k = (clock % 1.4) / 1.4;                                   // one "tap" (or one push) every 1.4 seconds
+    const press = k < .5 ? Math.sin(k / .5 * Math.PI) : 0, slide = h.slide ? Math.min(1, k / .6) * 30 * h.slide : 0;
+    if (!h.slide) { ctx.strokeStyle = `rgba(255,255,255,${(1 - k) * .9})`; ctx.lineWidth = 4; circle(h.x, h.y, 10 + k * 34); ctx.stroke(); }
+    else { ctx.globalAlpha = .9; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 5; ctx.lineCap = 'round';      // a curved "push this way" arrow
+      const ax = h.x + h.slide * 44, ay = h.y - 8; ctx.beginPath(); ctx.arc(h.x, h.y + 26, 46, -Math.PI / 2 - .5, -Math.PI / 2 + .5); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ax - h.slide * 4, ay - 11); ctx.lineTo(ax + h.slide * 6, ay + 3); ctx.lineTo(ax - h.slide * 12, ay + 6); ctx.stroke(); ctx.globalAlpha = 1; }
+    ctx.save(); ctx.translate(h.x + slide, h.y + 4 + press * 6); ctx.scale(1 - press * .12, 1 - press * .12);
+    ctx.font = '46px system-ui, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 8; ctx.fillText('👆', 0, -4); ctx.restore();
+  }
   function drawSwitch(s, L) {
     const A = P(s.id), busy = occupied(s), r = swR * (1 + s.pulse * .12), x = A.x + (s.shake > 0 ? Math.sin(s.shake * 38) * 7 * s.shake : 0), y = A.y;
     const rimW = Math.max(5, r * .13);
@@ -846,6 +891,7 @@ const SOUND_ON               = true;
     flashes.forEach(f => { ctx.strokeStyle = `rgba(255,255,255,${1 - f.t / .6})`; ctx.lineWidth = 4; circle(f.x, f.y + 8, 30 + f.t * 90); ctx.stroke(); });
     // vehicles go on top of the switch buttons, so they are never hidden
     trains.forEach(t => L.vehicle(t));
+    drawHint();
     // every press shows a ripple where the finger landed
     ripples.forEach(p => { const k = p.t / .45; ctx.strokeStyle = `rgba(255,255,255,${(1 - k) * (p.hit ? .95 : .5)})`; ctx.lineWidth = p.hit ? 5 : 3; circle(p.x, p.y, 12 + k * (p.hit ? 40 : 22)); ctx.stroke(); });
     if (crashAt) { const k = Math.min(1, crashAt.t * 3); ctx.fillStyle = `rgba(${L.burst},${1 - k * .6})`; circle(crashAt.x, crashAt.y, 20 + k * 50); ctx.fill(); }
@@ -918,6 +964,7 @@ const SOUND_ON               = true;
   window.__trains = { get phase() { return phase; }, get level() { return level; },
     get theme() { return themeName; }, setTheme(name) { return setTheme(name); },
     get difficulty() { return diffName; }, setDifficulty(name) { return setDifficulty(name); }, get crash() { return D.crash; }, get speed() { return speedName; }, setSpeed(name) { return setSpeed(name); }, cfg(n) { return levelCfg(n); },
+    get hint() { const h = hintSpot(); return { on: hintOn, spot: h && { x: cv.getBoundingClientRect().left + h.x, y: cv.getBoundingClientRect().top + h.y, slide: h.slide }, caption: $('hint').classList.contains('show') ? $('hint').textContent : '' }; },
     get controls() { return ctrlName; }, setControls(name) { return setControls(name); },
     get paused() { return paused; }, start(n) { start(Math.max(1, n | 0)); },
     layout() {   // sizes the layout test checks: switch buttons, tap reach and the boxes the stations fill
