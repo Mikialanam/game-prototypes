@@ -134,7 +134,7 @@ const SWITCH_SIZE_MAX        = 104;  // px: a switch button is never wider than 
 const SWITCH_GAP             = 14;   // px always kept clear between a switch button and other switches, stations and the top edge
 const ARROW_MIN_TILT         = 35;   // degrees: the arrow leans at least this far left or right so the way is easy to read (0 = exactly along the path)
 const TAP_RADIUS             = 100;  // px: a tap this close to a switch flips it, and the nearest switch wins (it shrinks only if it would reach a station)
-const CRASH_ON_BUSY_FLIP     = true; // true: tapping a switch with a vehicle on it crashes. false: the switch only shakes and stays put
+const CRASH_ON_BUSY_FLIP     = false; // true: tapping a switch with a vehicle on it crashes. false: the switch only shakes and stays put
 const COLOURS = ['#ff5d5d', '#4da3ff', '#ffcc33', '#b46bff']; // red, blue, yellow, purple: the same in every theme, because matching colours is the game
 const DEFAULT_THEME          = 'trains'; // theme shown the first time the game is opened (after that the player's pick is saved)
 // One row per theme. A theme only changes the look and the words; the levels, speeds and rules stay the same.
