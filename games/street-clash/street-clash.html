@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1a1626">
+<title>Street Clash</title>
+<style>
+  :root { --bg: #1a1626; --panel: #2a2440; --text: #f6f3ff; --muted: #a9a2c6; --accent: #ffd23f; --good: #4fd18b; --bad: #ff6b6b; --blue: #4d7cff; --pink: #ff5fa2; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden; touch-action: none;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; user-select: none; -webkit-user-select: none; }
+  body { display: flex; flex-direction: column; height: 100dvh; max-width: 480px; margin: 0 auto; }
+  #hud { padding: 6px 10px 6px; display: flex; flex-direction: column; gap: 5px; }
+  .row { display: flex; gap: 6px; align-items: center; }
+  .pill { background: var(--panel); border-radius: 999px; padding: 5px 10px; font-size: 14px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  #side { flex: 1; font-weight: 800; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .opRow { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+  .bar { position: relative; flex: 1; height: 12px; border-radius: 6px; background: #0e0b16; overflow: hidden; }
+  .bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; transition: width .25s, background .25s; }
+  #opNum { color: var(--text); font-weight: 800; min-width: 22px; text-align: right; }
+  #goal { font-size: 12px; color: var(--muted); text-align: center; min-height: 15px; }
+  #stage { position: relative; flex: 1; min-height: 0; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #controls { padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: 1fr; }
+  button { font: inherit; color: inherit; border: 0; cursor: pointer; }
+  #actBtn { min-height: 62px; border-radius: 16px; font-size: 19px; font-weight: 900; background: var(--accent); color: #2a2000; box-shadow: 0 5px 0 #b8901a; position: relative; overflow: hidden; }
+  #actBtn:active { transform: translateY(3px); box-shadow: 0 2px 0 #b8901a; }
+  #actBtn.cool { background: #4a4363; color: #cfc8ea; box-shadow: 0 5px 0 #2d2840; }
+  #actBtn .fill { position: absolute; left: 0; top: 0; bottom: 0; background: #ffffff22; pointer-events: none; }
+  .overlay { position: fixed; inset: 0; background: rgba(12,9,20,.9); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+  .overlay.show { display: flex; }
+  .sheet { background: var(--panel); border-radius: 20px; padding: 18px 16px; width: 100%; max-width: 420px; max-height: 100%; overflow-y: auto; text-align: center; }
+  .sheet h2 { margin: 0 0 6px; font-size: 25px; }
+  .sheet p { margin: 6px 0; font-size: 15px; line-height: 1.4; color: var(--muted); }
+  .btn { width: 100%; min-height: 58px; border-radius: 14px; font-size: 18px; font-weight: 800; margin-top: 10px; background: var(--accent); color: #2a2000; }
+  .btn.alt { background: #3a3358; color: var(--text); }
+  .btn:disabled { opacity: .4; }
+  .pick { display: block; width: 100%; text-align: left; border-radius: 16px; padding: 12px 14px; margin-top: 10px; min-height: 76px; color: #fff; }
+  .pick b { font-size: 19px; display: block; } .pick span { font-size: 13px; opacity: .92; line-height: 1.35; display: block; margin-top: 2px; }
+  .crisisBox { background: #3b2a2a; border-radius: 12px; padding: 10px; margin: 10px 0 4px; text-align: left; font-size: 14px; }
+  .bigscore { font-size: 56px; font-weight: 900; line-height: 1; margin: 6px 0; }
+  .newbest { color: var(--accent); font-weight: 800; min-height: 22px; }
+  .quote { font-style: italic; color: var(--text) !important; }
+  .shop { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .shop button { background: #3a3358; border-radius: 14px; padding: 10px 8px; min-height: 84px; font-size: 14px; font-weight: 700; line-height: 1.25; }
+  .shop button small { display: block; color: var(--muted); font-weight: 600; font-size: 12px; margin-top: 3px; }
+  .shop button.on { outline: 3px solid var(--good); }
+  .shop button:disabled { opacity: .4; }
+  .fine { font-size: 12px !important; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div class="row"><div id="side">✊ Street Clash</div><div class="pill" id="lvlPill">Lv 1</div><div class="pill" id="timePill">⏱ 60</div><div class="pill" id="scorePill">0</div></div>
+  <div class="opRow"><span>Public Opinion</span><div class="bar"><i id="opBar"></i></div><span id="opNum">50</span></div>
+  <div id="goal"></div>
+</div>
+<div id="stage"><canvas id="cv"></canvas></div>
+<div id="controls"><button id="actBtn"><div class="fill" id="actFill"></div><span id="actTxt">📣 CHANT</span></button></div>
+
+<div class="overlay show" id="startOv"><div class="sheet">
+  <div style="font-size:46px">🏛️💥</div>
+  <h2>Street Clash</h2>
+  <p>A big march on Port Halden City Hall. Pick a side. Cartoon bonks only: everybody gets back up.</p>
+  <button class="pick" id="pickProt" style="background:#d6457f"><b>✊ Protester</b><span>Dodge the cops, rally people on the way, reach the rally point. Smashing stuff loses the public.</span></button>
+  <button class="pick" id="pickPol" style="background:#3a63d8"><b>👮 Police</b><span>Clear the crowd before it reaches City Hall. Walk into people gently to escort them; run in to tackle. Go in too hard and the public turns.</span></button>
+  <div class="crisisBox"><b>📰 Today:</b> <span id="todayCrisis"></span></div>
+  <p class="fine" id="bestLine"></p>
+  <p class="fine">Drag anywhere on the street to move. Levels last about 60 seconds.</p>
+</div></div>
+
+<div class="overlay" id="lvlOv"><div class="sheet">
+  <div style="font-size:44px" id="lvlIcon">🎉</div>
+  <h2 id="lvlTitle">Level cleared</h2>
+  <p id="lvlLine"></p>
+  <p class="quote" id="lvlQuote"></p>
+  <p>Credits: <b id="lvlCred" style="color:var(--text)">0</b> 🪙 · pick one boost for the next level</p>
+  <div class="shop" id="shop"></div>
+  <button class="btn alt" id="adBtn">▶ Watch an ad: +15 🪙 <span class="fine">(placeholder, once)</span></button>
+  <button class="btn alt" id="buyBtn">🛒 Buy credits</button>
+  <p class="fine" id="buyNote" style="display:none">Placeholder: no real payments. Boosts are small and last one level, so paying can't win.</p>
+  <button class="btn" id="nextBtn">Next level</button>
+</div></div>
+
+<div class="overlay" id="overOv"><div class="sheet">
+  <div style="font-size:48px" id="overIcon">😵</div>
+  <h2 id="overTitle">Game over</h2>
+  <p id="overLine"></p>
+  <div class="bigscore" id="overScore">0</div>
+  <div class="newbest" id="overBest"></div>
+  <p class="quote" id="overQuote"></p>
+  <button class="btn" id="againBtn">Play again</button>
+  <button class="btn alt" id="switchBtn">Switch sides</button>
+  <button class="btn alt" id="homeBtn">All games</button>
+</div></div>
+
+<script>
+// ================= TUNABLE CONSTANTS =================
+const LEVEL_TIME         = 60;    // seconds per level
+const START_OPINION      = 50;
+const PLAYER_SPEED       = 155;   // px per second
+const NPC_RADIUS         = 13;
+const TUMBLE_TIME        = 1.1;   // seconds on the floor after a bonk
+const LEVEL_SPEEDUP      = 0.12;  // each level everyone is this much faster
+// protester side
+const STREET_LENGTH      = 2000;  // level 1 street, px
+const STREET_GROWTH      = 300;   // longer each level
+const COPS_BASE          = 5;     // cops on level 1 (+2 per level)
+const BYSTANDERS_BASE    = 20;    // people you can rally on level 1 (+3 per level)
+const ROWDY_SHARE        = 0.25;  // share of people who are rowdy (they smash things)
+const COP_SPEED          = 0.78;  // as a share of your speed
+const CHASE_RANGE        = 210;
+const RECRUIT_RANGE      = 42;
+const CHANT_RANGE        = 120;
+const CHANT_COOLDOWN     = 6;
+const BONK_LOSES         = 2;     // followers lost when a cop bonks you
+const SYMPATHY_GAIN      = 2;     // opinion gained when a cop bonks you
+const SMASH_TIME         = 0.5;   // push into a barrier this long to knock it over
+const SMASH_HIT          = 6;     // opinion lost per barrier you smash
+const ROWDY_SMASH_CHANCE = 0.06;  // per rowdy follower per second
+const ROWDY_SMASH_HIT    = 3;
+// police side
+const MARCH_SPEED        = 34;    // px per second
+const SPAWN_EVERY        = 1.35;  // seconds between marchers on level 1
+const HALL_LIMIT         = 8;     // marchers on the City Hall steps before you lose the level
+const ESCORT_SPEED       = 95;    // run into someone faster than this and it's a tackle; slower (or standing in their way) is an escort
+const ESCORT_TIME        = 0.6;
+const TACKLE_CALM_HIT    = 3;     // opinion lost for tackling a peaceful marcher
+const TACKLE_ROWDY_GAIN  = 1;
+const ESCORT_GAIN        = 1;
+const CHARGE_HIT         = 2;     // opinion lost just for charging (it's on the news)
+const CHARGE_COOLDOWN    = 5;
+const ROWDY_SMASH_GAIN   = 2;     // police side: a rowdy marcher smashing a window turns the public your way
+const OUTRAGE_OPINION    = 30;    // below this, outrage brings more marchers
+// both
+const BOOST_COST         = 15;
+const AD_CREDITS         = 15;
+const SOUND_ON           = true;
+// =====================================================
+
+(() => {
+  const STORE = 'streetclash.v1';
+  const $ = id => document.getElementById(id);
+  const load = () => { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch (e) { return {}; } };
+  const save = s => { try { localStorage.setItem(STORE, JSON.stringify(s)); } catch (e) {} };
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  let ac = null;
+  function tone(f1, f2, dur, type = 'square', vol = 0.08) {
+    if (!SOUND_ON) return;
+    try { ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      const o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.setValueAtTime(f1, ac.currentTime); o.frequency.exponentialRampToValueAtTime(f2, ac.currentTime + dur);
+      g.gain.value = vol; g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + dur); o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + dur);
+    } catch (e) {}
+  }
+  const sfx = { bonk: () => tone(320, 90, .18), boing: () => tone(200, 600, .15, 'triangle', .1), recruit: () => tone(700, 1100, .07, 'triangle', .07),
+    smash: () => { tone(1800, 300, .12, 'sawtooth', .05); setTimeout(() => tone(1400, 200, .1, 'sawtooth', .04), 50); }, whistle: () => { tone(2200, 2300, .08, 'sine', .05); setTimeout(() => tone(2200, 2300, .12, 'sine', .05), 110); },
+    chant: () => [440, 554, 659].forEach((f, i) => setTimeout(() => tone(f, f, .1, 'square', .05), i * 80)), win: () => [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, f, .13, 'triangle', .1), i * 110)),
+    lose: () => [392, 330, 262].forEach((f, i) => setTimeout(() => tone(f, f * .9, .18, 'sawtooth', .06), i * 150)) };
+
+  // ---------- daily crisis ----------
+  function hash(s) { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+  function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  const today = new Date().toISOString().slice(0, 10);
+  const CRISES = [
+    { icon: '🌧️', title: 'Rainy day: everyone slips. Tumbles last 50% longer.', mod: { tumble: 1.5 } },
+    { icon: '🔥', title: 'Heat wave: everybody moves 15% slower.', mod: { speed: 0.85 } },
+    { icon: '📺', title: 'Live TV crew: every opinion swing is 50% bigger.', mod: { opMul: 1.5 } },
+    { icon: '🏃', title: 'Marathon day: joggers cut across the street. Watch out.', mod: { joggers: true } },
+    { icon: '🎪', title: 'Festival weekend: 40% more people on the streets.', mod: { crowd: 1.4 } },
+  ];
+  const crisis = CRISES[Math.floor(rng(hash('clash' + today))() * CRISES.length)];
+  const D = Object.assign({ tumble: 1, speed: 1, opMul: 1, joggers: false, crowd: 1 }, crisis.mod);
+
+  // ---------- canvas ----------
+  const cv = $('cv'), ctx = cv.getContext('2d');
+  let W = 360, H = 500, DPR = 1;
+  function resize() { const r = $('stage').getBoundingClientRect(); W = r.width; H = r.height; DPR = Math.min(2, devicePixelRatio || 1); cv.width = W * DPR; cv.height = H * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
+  addEventListener('resize', resize);
+  const SIDEWALK = 30;
+
+  // ---------- state ----------
+  let S = null, store = load(), mode = 'prot', last = 0;
+  const SKIN = ['#f1c27d', '#e0ac69', '#c68642', '#8d5524', '#ffdbac', '#a5694f'];
+  const COLORS = ['#ff8a3d', '#3fc1c9', '#9b5de5', '#00bb6d', '#f15bb5', '#fee440', '#4d96ff'];
+  const SIGNS = ['MORE!', 'LESS!', 'WHY?', 'NOW!', 'NO!', 'YES!', 'HMM', 'FIX IT', 'BUT ALSO'];
+  function person(x, y, kind, extra = {}) {
+    return { x, y, kind, vx: 0, vy: 0, r: NPC_RADIUS, state: 'walk', t: 0, rot: 0, skin: SKIN[Math.random() * SKIN.length | 0],
+      color: kind === 'cop' || kind === 'mecop' ? '#2b4cc4' : kind === 'rowdy' ? '#9c1f2e' : kind === 'by' ? '#7d8597' : COLORS[Math.random() * COLORS.length | 0],
+      sign: SIGNS[Math.random() * SIGNS.length | 0], wob: Math.random() * 6, ...extra };
+  }
+  window.__clash = { get S() { return S; }, get mode() { return mode; }, D, crisis, tick: dt => update(dt) };
+
+  function newRun(m) {
+    mode = m;
+    S = { level: 0, score: 0, op: START_OPINION, credits: 0, adUsed: false, boost: null, over: false };
+    $('side').textContent = mode === 'prot' ? '✊ Protester' : '👮 Police';
+    $('actTxt').textContent = mode === 'prot' ? '📣 CHANT' : '🚨 CHARGE';
+    nextLevel();
+  }
+  function lvlSpeed() { return (1 + LEVEL_SPEEDUP * (S.level - 1)) * D.speed; }
+  function nextLevel() {
+    S.level++; S.time = LEVEL_TIME; S.pop = []; S.shards = []; S.cool = 0; S.boostT = 0; S.joggerT = 3; S.joggers = [];
+    S.player = person(W / 2, 0, mode === 'prot' ? 'me' : 'mecop'); S.player.inv = 0; S.player.push = 0;
+    S.levelStartOp = S.op; S.levelScore = 0; S.running = true; S.target = null;
+    if (mode === 'prot') {
+      const L = S.L = STREET_LENGTH + STREET_GROWTH * (S.level - 1);
+      S.player.y = L - 60; S.followers = []; S.barriers = []; S.npcs = []; S.cops = [];
+      for (let y = L - 380; y > 260; y -= rand(300, 420)) { // barrier rows with one gap, usually off to a side
+        const gapW = 64, gx = Math.random() < .5 ? rand(SIDEWALK + 4, SIDEWALK + 30) : rand(W - SIDEWALK - gapW - 30, W - SIDEWALK - gapW - 4);
+        S.barriers.push({ x: SIDEWALK, y, w: gx - SIDEWALK, h: 14, down: false }, { x: gx + gapW, y, w: W - SIDEWALK - gx - gapW, h: 14, down: false });
+      }
+      const nBy = Math.round((BYSTANDERS_BASE + 3 * (S.level - 1)) * D.crowd);
+      for (let i = 0; i < nBy; i++) S.npcs.push(person(rand(SIDEWALK + 14, W - SIDEWALK - 14), rand(160, L - 160), 'by', { rowdy: Math.random() < ROWDY_SHARE, home: 0 }));
+      const nCops = COPS_BASE + 2 * (S.level - 1);
+      for (let i = 0; i < nCops; i++) { const c = person(rand(SIDEWALK + 20, W - SIDEWALK - 20), rand(160, L - 360), 'cop'); c.hx = c.x; c.hy = c.y; S.cops.push(c); }
+      $('goal').textContent = 'Reach the rally point at the top. Rally people on the way.';
+    } else {
+      S.tackles = S.tackles || 0; S.escorts = S.escorts || 0; S.marchers = []; S.spawnT = 0.5; S.hall = 0; S.sitting = []; S.cleared = 0; S.player.y = H - 140; S.charging = 0; S.windows = [];
+      for (let y = 20; y < H - 100; y += 70) { S.windows.push({ x: 0, y, side: 0, broken: false }, { x: W - SIDEWALK, y: y + 35, side: 1, broken: false }); }
+      $('goal').textContent = `Clear the march before ${HALL_LIMIT} people reach the City Hall steps.`;
+    }
+    updateHud(); last = performance.now();
+  }
+
+  // ---------- input ----------
+  let dragging = false;
+  function setTarget(e) { const r = cv.getBoundingClientRect(); S.target = { x: e.clientX - r.left, y: e.clientY - r.top - 44 + (mode === 'prot' ? camY() : 0) }; }
+  cv.addEventListener('pointerdown', e => { if (!S || !S.running) return; dragging = true; cv.setPointerCapture(e.pointerId); setTarget(e); });
+  cv.addEventListener('pointermove', e => { if (dragging && S && S.running) setTarget(e); });
+  const stopDrag = () => { dragging = false; if (S) S.target = null; };
+  cv.addEventListener('pointerup', stopDrag); cv.addEventListener('pointercancel', stopDrag);
+  $('actBtn').addEventListener('pointerdown', e => { e.preventDefault(); action(); });
+  function action() {
+    if (!S || !S.running || S.cool > 0 || S.player.state !== 'walk') return;
+    if (mode === 'prot') {
+      S.cool = CHANT_COOLDOWN * (S.boost === 'horn' ? .6 : 1); S.boostT = 1.3; sfx.chant();
+      const range = CHANT_RANGE * (S.boost === 'mega' ? 1.5 : 1);
+      popText(S.player.x, S.player.y - 30, '📣 JOIN US!', '#ffd23f');
+      S.chantRing = { r: 0, max: range };
+      S.npcs.forEach(n => { if (n.state === 'walk' && dist(n, S.player) < range) tryRecruit(n, true); });
+    } else {
+      S.cool = CHARGE_COOLDOWN * (S.boost === 'radio' ? .6 : 1); S.charging = 1; sfx.whistle();
+      changeOp(-CHARGE_HIT, S.player.x, S.player.y - 30, 'Heavy-handed!');
+    }
+  }
+
+  // ---------- helpers ----------
+  function camY() { return mode === 'prot' ? clamp(S.player.y - H * 0.62, 0, Math.max(0, S.L - H)) : 0; }
+  function popText(x, y, text, color = '#fff') { S.pop.push({ x, y, text, color, t: 1 }); }
+  function changeOp(d, x, y, label) {
+    d = Math.round(d * D.opMul * (d < 0 && S.boost === 'cam' ? 0.5 : 1));
+    if (!d) return;
+    S.op = clamp(S.op + d, 0, 100);
+    popText(x, y - 16, `${label} ${d > 0 ? '+' : ''}${d}`, d > 0 ? '#4fd18b' : '#ff6b6b');
+  }
+  function tumble(p, txt) {
+    p.state = 'tumble'; p.t = TUMBLE_TIME * D.tumble; p.spin = (Math.random() < .5 ? -1 : 1) * rand(9, 14);
+    popText(p.x, p.y - 24, txt || ['BONK!', 'OOF!', 'WHOOPS!', 'BOING!'][Math.random() * 4 | 0], '#ffd23f'); sfx.bonk();
+  }
+  function shards(x, y) { for (let i = 0; i < 10; i++) S.shards.push({ x, y, vx: rand(-80, 80), vy: rand(-120, -20), t: .8 }); sfx.smash(); }
+  function moveToward(p, tx, ty, speed, dt) {
+    const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy);
+    if (d < 2) { p.vx = p.vy = 0; return; }
+    const s = Math.min(speed, d * 8); p.vx = dx / d * s; p.vy = dy / d * s; p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  function tryRecruit(n, chant) {
+    const chance = 0.35 + 0.65 * S.op / 100;
+    if (n.refused > 0) return;
+    if (Math.random() < chance || (chant && Math.random() < chance)) {
+      n.kind = n.rowdy ? 'rowdy' : 'prot'; n.color = n.rowdy ? '#9c1f2e' : COLORS[Math.random() * COLORS.length | 0];
+      S.npcs.splice(S.npcs.indexOf(n), 1); S.followers.push(n); sfx.recruit();
+      popText(n.x, n.y - 20, n.rowdy ? 'LET\'S GO!!' : '+1', n.rowdy ? '#ff6b6b' : '#4fd18b');
+    } else { n.refused = 3; popText(n.x, n.y - 20, 'Nah.', '#a9a2c6'); }
+  }
+  function rectHit(p, b) { const cx = clamp(p.x, b.x, b.x + b.w), cy = clamp(p.y, b.y, b.y + b.h); return Math.hypot(p.x - cx, p.y - cy) < p.r; }
+
+  // ---------- update ----------
+  function update(dt) {
+    if (!S || !S.running) return;
+    S.time -= dt; S.cool = Math.max(0, S.cool - dt); S.boostT = Math.max(0, S.boostT - dt);
+    const sp = lvlSpeed(), P = S.player;
+    P.inv = Math.max(0, P.inv - dt);
+    // player movement
+    if (P.state === 'tumble') { P.t -= dt; P.rot += P.spin * dt; if (P.t <= 0) { P.state = 'walk'; P.rot = 0; P.inv = 1.4; } P.vx = P.vy = 0; }
+    else if (S.target) {
+      let speed = PLAYER_SPEED * D.speed * (S.boost === 'shoes' ? 1.15 : 1) * (S.boostT > 0 ? 1.5 : 1) * (S.charging > 0 ? 1.9 : 1);
+      const ox = P.x, oy = P.y;
+      moveToward(P, S.target.x, S.target.y, speed, dt);
+      P.x = clamp(P.x, SIDEWALK + P.r, W - SIDEWALK - P.r);
+      if (mode === 'prot') {
+        P.y = clamp(P.y, 20, S.L - 20);
+        // barriers block; push into one long enough and it goes over (opinion hit)
+        let blocked = null;
+        for (const b of S.barriers) if (!b.down && rectHit(P, b)) blocked = b;
+        if (blocked) {
+          P.x = ox; P.y = oy; P.push += dt;
+          if (P.push > SMASH_TIME) { blocked.down = true; P.push = 0; shards(P.x, blocked.y); popText(P.x, blocked.y - 10, 'CRASH!', '#ff6b6b'); changeOp(-SMASH_HIT, P.x, blocked.y - 10, 'Vandals!'); }
+        } else P.push = 0;
+      } else P.y = clamp(P.y, 20, H - 70);
+    } else { P.vx = P.vy = 0; P.push = 0; }
+    if (D.joggers) updateJoggers(dt, sp);
+    mode === 'prot' ? updateProt(dt, sp) : updatePol(dt, sp);
+    S.pop = S.pop.filter(p => (p.t -= dt * 0.9) > 0);
+    S.shards = S.shards.filter(s => { s.vy += 300 * dt; s.x += s.vx * dt; s.y += s.vy * dt; return (s.t -= dt) > 0; });
+    if (S.chantRing) { S.chantRing.r += 500 * dt; if (S.chantRing.r > S.chantRing.max) S.chantRing = null; }
+    if (S.op <= 0) return endLevel(false, 'opinion');
+    if (S.time <= 0) return mode === 'prot' ? endLevel(false, 'time') : endLevel(true);
+    updateHud();
+  }
+  function walkNpc(n, dt) { if (n.state === 'tumble') { n.t -= dt; n.rot += n.spin * dt; if (n.t <= 0) { n.state = 'walk'; n.rot = 0; popText(n.x, n.y - 20, 'I\'m OK!', '#fff'); sfx.boing(); return 'up'; } return 'down'; } return 'walk'; }
+
+  function updateProt(dt, sp) {
+    const P = S.player;
+    // bystanders wander; recruit on touch
+    for (const n of S.npcs.slice()) {
+      const st = walkNpc(n, dt); if (st === 'down') continue;
+      n.refused = Math.max(0, (n.refused || 0) - dt);
+      n.wob += dt; n.x = clamp(n.x + Math.sin(n.wob) * 12 * dt, SIDEWALK + 12, W - SIDEWALK - 12);
+      if (P.state === 'walk' && dist(n, P) < RECRUIT_RANGE) tryRecruit(n, false);
+    }
+    // followers trail in a line
+    S.followers.forEach((f, i) => {
+      const st = walkNpc(f, dt); if (st === 'down') return;
+      const lead = i === 0 ? P : S.followers[i - 1];
+      if (dist(f, lead) > 20) moveToward(f, lead.x, lead.y, PLAYER_SPEED * 1.25 * D.speed * (S.boostT > 0 ? 1.5 : 1), dt);
+      if (f.kind === 'rowdy' && Math.random() < ROWDY_SMASH_CHANCE * dt) {
+        const sx = f.x < W / 2 ? SIDEWALK / 2 : W - SIDEWALK / 2; shards(sx, f.y); popText(sx + (f.x < W / 2 ? 30 : -30), f.y - 14, 'SMASH!', '#ff6b6b');
+        changeOp(-ROWDY_SMASH_HIT, f.x, f.y - 20, 'Window!');
+      }
+    });
+    // cops: patrol near home, chase when close, bonk on touch
+    for (const c of S.cops) {
+      if (walkNpc(c, dt) === 'down') continue;
+      c.proud = Math.max(0, (c.proud || 0) - dt);
+      if (c.proud > 0) { c.rot = Math.sin(c.proud * 20) * .3; continue; } else c.rot = 0;
+      const d = dist(c, P);
+      if (d < CHASE_RANGE && P.state === 'walk') { if (!c.chasing) { c.chasing = true; popText(c.x, c.y - 22, '!', '#4d7cff'); } moveToward(c, P.x, P.y, PLAYER_SPEED * COP_SPEED * sp, dt); }
+      else { c.chasing = false; c.wob += dt; moveToward(c, c.hx + Math.sin(c.wob * .7) * 40, c.hy, 30, dt); }
+      if (d < c.r + P.r && P.state === 'walk' && P.inv <= 0) {
+        tumble(P, 'BONK!'); c.proud = 1.6; sfx.whistle();
+        const lost = S.followers.splice(Math.max(0, S.followers.length - BONK_LOSES), BONK_LOSES);
+        lost.forEach(f => { f.kind = 'by'; f.color = '#7d8597'; f.refused = 2; tumble(f, 'WAH!'); S.npcs.push(f); });
+        changeOp(SYMPATHY_GAIN, P.x, P.y - 40, 'Too rough!');
+      }
+    }
+    // rally point
+    if (P.y < 90) endLevel(true);
+  }
+
+  function updatePol(dt, sp) {
+    const P = S.player;
+    S.charging = Math.max(0, S.charging - dt);
+    S.spawnT -= dt;
+    if (S.spawnT <= 0) {
+      const outrage = S.op < OUTRAGE_OPINION ? 1.5 : 1;
+      S.spawnT = SPAWN_EVERY / (1 + 0.22 * (S.level - 1)) / outrage / D.crowd;
+      const rowdy = Math.random() < ROWDY_SHARE;
+      S.marchers.push(person(rand(SIDEWALK + 16, W - SIDEWALK - 16), -16, rowdy ? 'rowdy' : 'prot', { rowdy, esc: 0, leaving: false, target: null }));
+    }
+    const hallY = H - 62;
+    for (const m of S.marchers.slice()) {
+      const st = walkNpc(m, dt);
+      if (st === 'down') continue;
+      if (st === 'up') { // got back up after a tackle
+        if (m.rowdy || Math.random() < .5) { m.leaving = true; S.cleared++; popText(m.x, m.y - 30, 'Fine, fine!', '#fff'); }
+        else popText(m.x, m.y - 30, 'Still here!', '#ff5fa2');
+      }
+      if (m.leaving) { moveToward(m, m.x + (m.x < W / 2 ? -40 : 40), -60, 80, dt); if (m.y < -30 || m.x < -20 || m.x > W + 20) S.marchers.splice(S.marchers.indexOf(m), 1); continue; }
+      // rowdy marchers sometimes veer to smash a shop window
+      if (m.rowdy && !m.target && Math.random() < 0.25 * dt) { const w = S.windows.filter(w => !w.broken && w.y > m.y - 20 && w.y < m.y + 120)[0]; if (w) m.target = w; }
+      if (m.target) {
+        const wx = m.target.side ? W - SIDEWALK - 8 : SIDEWALK + 8; moveToward(m, wx, m.target.y + 20, MARCH_SPEED * 1.6 * sp, dt);
+        if (Math.abs(m.x - wx) < 6) { m.target.broken = true; shards(wx, m.target.y + 20); popText(W / 2, m.y - 20, 'SMASH!', '#ff6b6b'); changeOp(ROWDY_SMASH_GAIN, W / 2, m.y, 'Public turns on rioters'); m.target = null; }
+      } else { m.wob += dt * 3; m.y += MARCH_SPEED * sp * dt; m.x = clamp(m.x + Math.sin(m.wob) * 10 * dt, SIDEWALK + 12, W - SIDEWALK - 12); }
+      // reaching City Hall
+      if (m.y > hallY) { S.hall++; S.marchers.splice(S.marchers.indexOf(m), 1); S.sitting.push({ x: m.x, color: m.color, skin: m.skin, sign: m.sign }); popText(m.x, hallY - 20, 'SIT-IN!', '#ff5fa2'); sfx.boing(); if (S.hall >= HALL_LIMIT) return endLevel(false, 'hall'); continue; }
+      // contact with the player: escort (slow) or tackle (fast)
+      const reach = S.charging > 0 ? m.r + P.r + 16 : m.r + P.r;
+      if (P.state === 'walk' && dist(m, P) < reach) {
+        // only running *into* someone counts as a tackle; brushing past or standing in their way is an escort
+        const dd = Math.max(1, dist(m, P)), approach = (P.vx * (m.x - P.x) + P.vy * (m.y - P.y)) / dd;
+        if (S.charging > 0 || approach > ESCORT_SPEED) {
+          S.tackles++;
+          tumble(m); m.esc = 0;
+          if (m.rowdy) changeOp(TACKLE_ROWDY_GAIN, m.x, m.y - 20, 'Good stop');
+          else changeOp(-TACKLE_CALM_HIT, m.x, m.y - 20, 'Too hard!');
+        } else {
+          m.esc += dt; m.y -= MARCH_SPEED * sp * dt; // they stop when you block them
+          if (m.esc > ESCORT_TIME) { m.leaving = true; S.cleared++; S.escorts++; popText(m.x, m.y - 24, 'OK, OK!', '#fff'); changeOp(ESCORT_GAIN, m.x, m.y - 30, 'Calm'); sfx.recruit(); }
+        }
+      } else m.esc = Math.max(0, m.esc - dt);
+    }
+  }
+
+  function updateJoggers(dt, sp) {
+    S.joggerT -= dt;
+    if (S.joggerT <= 0) { S.joggerT = rand(2.5, 4.5); const left = Math.random() < .5, y = mode === 'prot' ? camY() + rand(60, H - 80) : rand(60, H - 160);
+      S.joggers.push(person(left ? -15 : W + 15, y, 'jog', { color: '#ffffff', dir: left ? 1 : -1 })); }
+    const all = [S.player, ...(mode === 'prot' ? S.cops : S.marchers)];
+    S.joggers = S.joggers.filter(j => { j.x += j.dir * 130 * sp * dt;
+      for (const p of all) if (p.state === 'walk' && dist(p, j) < p.r + j.r && !(p === S.player && p.inv > 0)) { tumble(p, 'WHOOPS!'); if (p === S.player) S.player.inv = 0; }
+      return j.x > -30 && j.x < W + 30; });
+  }
+
+  // ---------- level end ----------
+  function levelPoints(win) {
+    const mult = S.op / 50;
+    if (mode === 'prot') return win ? Math.round((S.followers.length * 10 + Math.ceil(S.time) * 2) * mult) : 0;
+    return Math.round((S.cleared * 10 + (win ? (HALL_LIMIT - S.hall) * 5 : 0)) * mult);
+  }
+  function quote() {
+    const d = S.op - S.levelStartOp;
+    if (S.op < 25) return mode === 'prot' ? '"You won the street and lost the city." — Halden Herald' : '"Order restored. Trust? Not so much." — Halden Herald';
+    if (d <= -8) return '"Winning the fight isn\'t the same as winning the public."';
+    if (d >= 4) return mode === 'prot' ? '"A peaceful march with a point. Even the bakers waved."' : '"Calm, firm, and nobody got hurt. Rare scenes."';
+    return '"Port Halden shrugs and gets on with its day."';
+  }
+  function endLevel(win, why) {
+    S.running = false; stopDrag();
+    const pts = levelPoints(win); S.score += pts; S.levelScore = pts; S.credits += Math.floor(pts / 6);
+    updateHud();
+    if (!win) return gameOver(why);
+    sfx.win();
+    $('lvlIcon').textContent = mode === 'prot' ? '📣' : '🏛️';
+    $('lvlTitle').textContent = `Level ${S.level} cleared`;
+    $('lvlLine').innerHTML = (mode === 'prot' ? `You reached the rally with <b>${S.followers.length}</b> ${S.followers.length === 1 ? 'person' : 'people'}.` : `<b>${S.cleared}</b> cleared, <b>${S.hall}</b> on the steps.`) + ` +${pts} points (× opinion ${Math.round(S.op)}/50).`;
+    $('lvlQuote').textContent = quote();
+    S.boost = null; renderShop();
+    $('adBtn').disabled = S.adUsed; $('buyNote').style.display = 'none';
+    $('lvlOv').classList.add('show');
+  }
+  const BOOSTS = { prot: { mega: ['📢 Megaphone', 'Chant reaches 50% further'], shoes: ['👟 Running shoes', '15% faster'] },
+                   pol: { cam: ['📹 Body cam', 'Opinion losses halved (you\'re careful on camera)'], radio: ['📻 Radio', 'Charge recharges 40% faster'] } };
+  function renderShop() {
+    $('lvlCred').textContent = S.credits;
+    const b = BOOSTS[mode];
+    $('shop').innerHTML = Object.entries(b).map(([k, [n, d]]) => `<button data-k="${k}" class="${S.boost === k ? 'on' : ''}" ${S.boost || S.credits < BOOST_COST ? (S.boost === k ? '' : 'disabled') : ''}>${n}<small>${d} · ${BOOST_COST}🪙 · 1 level</small></button>`).join('');
+    $('shop').querySelectorAll('button').forEach(btn => btn.onclick = () => { if (S.boost) return; S.boost = btn.dataset.k; S.credits -= BOOST_COST; sfx.recruit(); renderShop(); });
+  }
+  $('adBtn').onclick = () => { if (S.adUsed) return; S.adUsed = true; $('adBtn').disabled = true; $('adBtn').textContent = '📺 (ad placeholder plays…)'; setTimeout(() => { S.credits += AD_CREDITS; $('adBtn').textContent = `✓ +${AD_CREDITS} 🪙`; renderShop(); }, 1500); };
+  $('buyBtn').onclick = () => { $('buyNote').style.display = 'block'; };
+  $('nextBtn').onclick = () => { $('lvlOv').classList.remove('show'); const keep = S.boost; nextLevel(); S.boost = keep; };
+  function gameOver(why) {
+    S.over = true; sfx.lose();
+    const key = mode === 'prot' ? 'bestProt' : 'bestPol', best = store[key] || 0, isBest = S.score > best;
+    if (isBest) { store[key] = S.score; save(store); }
+    $('overIcon').textContent = why === 'opinion' ? '📉' : why === 'hall' ? '🏛️' : '⏰';
+    $('overTitle').textContent = why === 'opinion' ? 'Lost the public' : why === 'hall' ? 'They took the steps' : 'The rally fizzled';
+    $('overLine').textContent = why === 'opinion' ? (mode === 'prot' ? 'Public Opinion hit zero. Nobody wants to march with you now.' : 'Public Opinion hit zero. The chief takes you off the street.')
+      : why === 'hall' ? `${HALL_LIMIT} marchers are sitting on the City Hall steps. The mayor has to come out and talk.` : 'Time ran out before you reached the rally point.';
+    $('overScore').textContent = S.score;
+    $('overBest').textContent = isBest ? '★ New best!' : `Best as ${mode === 'prot' ? 'protester' : 'police'}: ${best}`;
+    $('overQuote').textContent = `Reached level ${S.level} · final opinion ${Math.round(S.op)}${mode === 'pol' ? ` · ${S.tackles} tackles, ${S.escorts} escorts` : ''}. ` + (S.op < 30 ? 'Winning the fight isn\'t the same as winning the public.' : '');
+    $('overOv').classList.add('show');
+  }
+
+  // ---------- HUD ----------
+  function updateHud() {
+    $('lvlPill').textContent = 'Lv ' + S.level;
+    $('timePill').textContent = '⏱ ' + Math.max(0, Math.ceil(S.time));
+    $('scorePill').textContent = '★ ' + (S.score + (S.running ? levelPoints(mode === 'pol') : 0));
+    $('opNum').textContent = Math.round(S.op); $('opBar').style.width = S.op + '%';
+    $('opBar').style.background = S.op >= 50 ? 'var(--good)' : S.op >= 30 ? '#ffb347' : 'var(--bad)';
+    const maxC = mode === 'prot' ? CHANT_COOLDOWN : CHARGE_COOLDOWN;
+    $('actBtn').classList.toggle('cool', S.cool > 0); $('actFill').style.width = (S.cool > 0 ? (1 - S.cool / maxC) * 100 : 0) + '%';
+    if (mode === 'prot') $('goal').textContent = `${S.followers.length} with you · ${Math.max(0, Math.round((S.player.y - 90) / 10))} m to the rally`;
+    else $('goal').textContent = `Cleared ${S.cleared} · on the steps ${S.hall}/${HALL_LIMIT} · slow = escort, fast = tackle`;
+  }
+
+  // ---------- drawing ----------
+  function drawStreet(cam) {
+    ctx.fillStyle = '#3b3f4c'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#8a8fa0'; ctx.fillRect(0, 0, SIDEWALK, H); ctx.fillRect(W - SIDEWALK, 0, SIDEWALK, H);
+    // shop fronts
+    const step = 70, off = cam % step;
+    for (let y = -off - step; y < H + step; y += step) {
+      const idx = Math.floor((y + cam) / step);
+      for (const side of [0, 1]) {
+        const x = side ? W - SIDEWALK + 4 : 2, hue = (idx * 47 + side * 120) % 360;
+        ctx.fillStyle = `hsl(${hue},45%,55%)`; ctx.fillRect(x, y + 4, SIDEWALK - 6, step - 8);
+        ctx.fillStyle = '#bfe3ff'; ctx.fillRect(x + 4, y + 14, SIDEWALK - 14, step - 30);
+      }
+    }
+    // lane dashes
+    ctx.fillStyle = '#ffffff55';
+    for (let y = -(cam % 60) - 60; y < H; y += 60) ctx.fillRect(W / 2 - 2, y, 4, 30);
+  }
+  function drawPerson(p, cam, opts = {}) {
+    const x = p.x, y = p.y - cam;
+    if (y < -40 || y > H + 40) return;
+    ctx.save(); ctx.translate(x, y);
+    // shadow
+    ctx.fillStyle = '#0005'; ctx.beginPath(); ctx.ellipse(0, p.r * .8, p.r * .9, p.r * .35, 0, 0, 7); ctx.fill();
+    ctx.rotate(p.rot || 0);
+    const r = p.r;
+    // sign on a stick
+    if ((p.kind === 'prot' || p.kind === 'me') && p.state !== 'tumble') {
+      ctx.fillStyle = '#6b4a2b'; ctx.fillRect(r * .5, -r * 2.2, 3, r * 1.8);
+      ctx.fillStyle = '#fff'; ctx.fillRect(r * .5 - 16, -r * 3.1, 34, 15);
+      ctx.fillStyle = '#222'; ctx.font = 'bold 9px system-ui'; ctx.textAlign = 'center'; ctx.fillText(p.kind === 'me' ? 'YOU!' : p.sign, r * .5 + 1, -r * 3.1 + 11);
+    }
+    // body
+    ctx.fillStyle = p.color; ctx.beginPath(); ctx.ellipse(0, 0, r, r * .85, 0, 0, 7); ctx.fill();
+    if (p.kind === 'cop' || p.kind === 'mecop') { ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(-r * .35, -r * .1, 3, 0, 7); ctx.fill(); }
+    // head
+    ctx.fillStyle = p.skin; ctx.beginPath(); ctx.arc(0, -r * .85, r * .62, 0, 7); ctx.fill();
+    // eyes (x_x when tumbling)
+    ctx.strokeStyle = '#222'; ctx.fillStyle = '#222'; ctx.lineWidth = 1.5;
+    if (p.state === 'tumble') { for (const ex of [-3.5, 3.5]) { ctx.beginPath(); ctx.moveTo(ex - 2, -r * .95 - 2); ctx.lineTo(ex + 2, -r * .95 + 2); ctx.moveTo(ex + 2, -r * .95 - 2); ctx.lineTo(ex - 2, -r * .95 + 2); ctx.stroke(); } }
+    else { ctx.beginPath(); ctx.arc(-3.5, -r * .95, 1.6, 0, 7); ctx.arc(3.5, -r * .95, 1.6, 0, 7); ctx.fill(); }
+    // hats and bandanas
+    if (p.kind === 'cop' || p.kind === 'mecop') { ctx.fillStyle = '#16245e'; ctx.beginPath(); ctx.arc(0, -r * 1.1, r * .62, Math.PI, 0); ctx.fill(); ctx.fillRect(-r * .8, -r * 1.12, r * 1.6, 3); }
+    if (p.kind === 'rowdy' || (p.kind === 'by' && p.rowdy)) { ctx.fillStyle = '#e63946'; ctx.fillRect(-r * .62, -r * .78, r * 1.24, 4); }
+    if (p.kind === 'jog') { ctx.fillStyle = '#ff5fa2'; ctx.fillRect(-r * .62, -r * 1.25, r * 1.24, 3); }
+    ctx.restore();
+    // tumble stars
+    if (p.state === 'tumble') { const t = performance.now() / 150; ctx.fillStyle = '#ffd23f'; for (let i = 0; i < 3; i++) { const a = t + i * 2.1; ctx.beginPath(); ctx.arc(x + Math.cos(a) * 14, y - r * 1.6 + Math.sin(a) * 5, 2.6, 0, 7); ctx.fill(); } }
+    if (p.kind === 'by' && p.state === 'walk') { ctx.fillStyle = p.refused > 0 ? '#a9a2c6' : '#fff'; ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillText(p.refused > 0 ? '…' : '?', x, y - r * 1.8); }
+    if (opts.ring) { ctx.strokeStyle = S.player.inv > 0 && Math.floor(performance.now() / 100) % 2 ? '#fff4' : '#fff'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x, y, r + 5, 0, 7); ctx.stroke(); }
+    if (opts.charge) { ctx.strokeStyle = '#ff5fa2'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, r + 16, 0, 7); ctx.stroke(); }
+  }
+  function draw() {
+    if (!S) { ctx.fillStyle = '#3b3f4c'; ctx.fillRect(0, 0, W, H); return; }
+    const cam = camY();
+    drawStreet(cam);
+    if (mode === 'prot') {
+      // rally point banner at the top of the street
+      const ry = 40 - cam;
+      if (ry > -80) { ctx.fillStyle = '#d6457f'; ctx.fillRect(SIDEWALK, ry - 30, W - SIDEWALK * 2, 50); ctx.fillStyle = '#fff'; ctx.font = 'bold 20px system-ui'; ctx.textAlign = 'center'; ctx.fillText('📣 RALLY POINT', W / 2, ry + 2); }
+      for (const b of S.barriers) {
+        const y = b.y - cam; if (y < -20 || y > H + 20) continue;
+        if (b.down) { ctx.fillStyle = '#7a5a2a'; ctx.fillRect(b.x, y + 8, b.w, 5); continue; }
+        ctx.fillStyle = '#ff9f1c'; ctx.fillRect(b.x, y, b.w, b.h); ctx.fillStyle = '#fff';
+        for (let x = b.x + 4; x < b.x + b.w - 8; x += 18) { ctx.beginPath(); ctx.moveTo(x, y + b.h); ctx.lineTo(x + 8, y); ctx.lineTo(x + 14, y); ctx.lineTo(x + 6, y + b.h); ctx.fill(); }
+      }
+      S.npcs.forEach(n => drawPerson(n, cam));
+      S.followers.forEach(f => drawPerson(f, cam));
+      S.cops.forEach(c => drawPerson(c, cam));
+      drawPerson(S.player, cam, { ring: true });
+      if (S.player.push > 0) { ctx.fillStyle = '#ff6b6b'; ctx.fillRect(S.player.x - 15, S.player.y - cam + 20, 30 * S.player.push / SMASH_TIME, 4); }
+    } else {
+      // shop windows that rowdy marchers can smash
+      for (const w of S.windows) { const x = w.side ? W - SIDEWALK + 4 : 2; ctx.fillStyle = w.broken ? '#555' : '#bfe3ff'; ctx.fillRect(x + 4, w.y + 10, SIDEWALK - 14, 26); if (w.broken) { ctx.strokeStyle = '#ddd'; ctx.beginPath(); ctx.moveTo(x + 6, w.y + 12); ctx.lineTo(x + 18, w.y + 34); ctx.moveTo(x + 18, w.y + 12); ctx.lineTo(x + 8, w.y + 30); ctx.stroke(); } }
+      // City Hall
+      const hy = H - 62;
+      ctx.fillStyle = '#d9d3c3'; ctx.fillRect(0, hy, W, 62);
+      ctx.fillStyle = '#bdb6a3'; for (let i = 0; i < 3; i++) ctx.fillRect(0, hy + i * 7, W, 3);
+      ctx.fillStyle = '#efe9da'; for (let x = 24; x < W - 10; x += 42) ctx.fillRect(x, hy + 22, 12, 40);
+      ctx.fillStyle = '#5b5446'; ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillText('🏛️ CITY HALL', W / 2, H - 6);
+      S.sitting.forEach((s, i) => drawPerson({ x: s.x, y: hy + 10 + (i % 2) * 6, r: NPC_RADIUS * .85, kind: 'prot', color: s.color, skin: s.skin, sign: s.sign, state: 'walk' }, 0));
+      S.marchers.forEach(m => drawPerson(m, 0));
+      drawPerson(S.player, 0, { ring: true, charge: S.charging > 0 });
+    }
+    (S.joggers || []).forEach(j => drawPerson(j, cam));
+    if (S.chantRing) { ctx.strokeStyle = '#ffd23f88'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(S.player.x, S.player.y - cam, S.chantRing.r, 0, 7); ctx.stroke(); }
+    ctx.fillStyle = '#cfe8ff'; S.shards.forEach(s => ctx.fillRect(s.x - 2, s.y - cam - 2, 4, 4));
+    ctx.textAlign = 'center';
+    S.pop.forEach(p => { ctx.globalAlpha = Math.min(1, p.t * 1.5); ctx.font = 'bold 15px system-ui'; ctx.lineWidth = 3; ctx.strokeStyle = '#000a'; const y = p.y - cam - (1 - p.t) * 30; ctx.strokeText(p.text, p.x, y); ctx.fillStyle = p.color; ctx.fillText(p.text, p.x, y); });
+    ctx.globalAlpha = 1;
+    if (S.running && S.time > LEVEL_TIME - 2) { ctx.fillStyle = '#000a'; ctx.fillRect(0, H / 2 - 30, W, 60); ctx.fillStyle = '#fff'; ctx.font = 'bold 22px system-ui'; ctx.fillText(`Level ${S.level} · ${mode === 'prot' ? 'Go!' : 'Hold the line!'}`, W / 2, H / 2 + 8); }
+  }
+  function loop(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (S && S.running) update(dt);
+    draw(); requestAnimationFrame(loop);
+  }
+
+  // ---------- screens ----------
+  $('todayCrisis').textContent = crisis.icon + ' ' + crisis.title;
+  function bestText() { return `Best as protester: ${store.bestProt || 0} · as police: ${store.bestPol || 0}`; }
+  $('bestLine').textContent = bestText();
+  function start(m) { $('startOv').classList.remove('show'); resize(); newRun(m); }
+  $('pickProt').onclick = () => start('prot');
+  $('pickPol').onclick = () => start('pol');
+  $('againBtn').onclick = () => { $('overOv').classList.remove('show'); store = load(); newRun(mode); };
+  $('switchBtn').onclick = () => { $('overOv').classList.remove('show'); store = load(); $('bestLine').textContent = bestText(); $('startOv').classList.add('show'); };
+  $('homeBtn').onclick = () => { location.href = '../../index.html'; };
+  resize(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
