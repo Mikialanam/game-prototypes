@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1d1630">
+<title>Property Tycoon</title>
+<style>
+  :root { --bg: #1d1630; --panel: #2a2145; --panel2: #372b5a; --text: #f6f2ff; --muted: #a99cc9; --accent: #3ddc84; --gold: #ffd54d; --bad: #ff6b6b; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  body { min-height: 100dvh; }
+  .top { position: sticky; top: 0; z-index: 3; background: linear-gradient(var(--bg) 85%, transparent); padding: 12px 16px 14px; }
+  header { display: flex; justify-content: space-between; align-items: center; }
+  h1 { font-size: 20px; margin: 0; }
+  .pill { background: var(--panel); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 700; }
+  #money { font-size: 44px; font-weight: 800; margin-top: 8px; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  #money.bump { animation: bump .25s ease-out; }
+  @keyframes bump { 50% { transform: scale(1.06); } }
+  #rate { color: var(--accent); font-weight: 700; font-size: 15px; }
+  main { padding: 0 16px calc(24px + env(safe-area-inset-bottom)); max-width: 480px; margin: 0 auto; }
+  .prop { background: var(--panel); border-radius: 18px; padding: 14px; margin-bottom: 12px; position: relative; overflow: hidden; }
+  .prop.locked { opacity: .45; }
+  .prop.fresh { animation: fresh .6s ease-out; }
+  @keyframes fresh { 0% { transform: scale(.9); background: #4a3a7a; } 100% { transform: none; } }
+  .row1 { display: flex; align-items: center; gap: 12px; }
+  .emo { font-size: 40px; width: 52px; text-align: center; line-height: 1; }
+  .info { flex: 1; min-width: 0; } .info b { font-size: 17px; display: block; } .info span { font-size: 13px; color: var(--muted); }
+  .lvl { font-size: 13px; font-weight: 800; background: var(--panel2); border-radius: 8px; padding: 3px 8px; white-space: nowrap; }
+  .cyc { height: 10px; background: #1a1430; border-radius: 99px; overflow: hidden; margin: 12px 0 10px; }
+  .cyc div { height: 100%; width: 0; background: var(--gold); }
+  button.act { width: 100%; min-height: 54px; border: 0; border-radius: 14px; font-size: 18px; font-weight: 800; background: var(--accent); color: #062a15; }
+  button.act.up { background: #7c6cff; color: #fff; }
+  button.act:disabled { background: var(--panel2); color: var(--muted); }
+  button.act:not(:disabled):active { transform: scale(.97); }
+  .prop.hint button.act:not(:disabled) { animation: hint 1s infinite; }
+  @keyframes hint { 50% { box-shadow: 0 0 0 6px rgba(61,220,132,.35); } }
+  .float { position: absolute; right: 18px; top: 10px; font-weight: 800; color: var(--gold); pointer-events: none; animation: floatUp .9s ease-out forwards; font-size: 18px; }
+  @keyframes floatUp { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-30px); } }
+  .foot { text-align: center; margin-top: 18px; } .foot button { background: none; border: 0; color: var(--muted); font-size: 13px; text-decoration: underline; padding: 10px; }
+  .overlay { position: fixed; inset: 0; background: rgba(10,6,20,.88); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+  .overlay.show { display: flex; }
+  .card { background: var(--panel); border-radius: 22px; padding: 24px 20px; width: 100%; max-width: 400px; text-align: center; }
+  .card h2 { margin: 0 0 8px; font-size: 28px; }
+  .rule { font-size: 18px; line-height: 1.4; margin: 8px 0; }
+  .sub { color: var(--muted); font-size: 14px; margin: 6px 0; }
+  .big { font-size: 48px; font-weight: 800; margin: 6px 0; color: var(--gold); }
+  .emoji { font-size: 54px; line-height: 1; }
+  button.btn { width: 100%; min-height: 64px; border: 0; border-radius: 16px; font-size: 20px; font-weight: 800; margin-top: 12px;
+    background: var(--gold); color: #3a2a00; box-shadow: 0 6px 0 #c7a12c; }
+  button.btn:active { transform: translateY(3px); box-shadow: 0 3px 0 #c7a12c; }
+  #banner { position: fixed; left: 0; right: 0; margin: 0 auto; width: fit-content; max-width: 92vw; top: 40%; background: var(--gold); color: #3a2a00; font-weight: 800; font-size: 20px;
+    padding: 12px 20px; border-radius: 14px; z-index: 8; display: none; text-align: center; box-shadow: 0 8px 20px rgba(0,0,0,.4); }
+  #banner.show { display: block; animation: pop .5s ease-out; }
+  @keyframes pop { 0% { transform: scale(.3); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
+  #fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; }
+</style>
+</head>
+<body>
+<div class="top">
+  <header><h1>🏦 Property Tycoon</h1><div class="pill" id="bestPill">Lifetime 🪙 0</div></header>
+  <div id="money">🪙 0</div>
+  <div id="rate">+0 / sec</div>
+</div>
+<main>
+  <div id="list"></div>
+  <div class="foot"><button id="resetBtn">Reset progress</button></div>
+</main>
+<div id="banner"></div>
+
+<div class="overlay" id="startOv">
+  <div class="card">
+    <div class="emoji">🏦</div>
+    <h2>Property Tycoon</h2>
+    <p class="rule"><b>Buy</b> a property and it pays <b style="color:var(--gold)">rent</b> automatically.</p>
+    <p class="rule">Spend rent on more properties and <b>upgrades</b>. Rent keeps coming while you're away.</p>
+    <button class="btn" id="startBtn">Start</button>
+  </div>
+</div>
+
+<div class="overlay" id="awayOv">
+  <div class="card">
+    <div class="emoji">💰</div>
+    <h2>Welcome back!</h2>
+    <p class="sub" id="awayTime">You were away 0m</p>
+    <p class="rule">Your properties earned</p>
+    <div class="big" id="awayAmt">🪙 0</div>
+    <p class="sub" id="awayCap"></p>
+    <button class="btn" id="collectBtn">Collect</button>
+  </div>
+</div>
+<canvas id="fx"></canvas>
+
+<script>
+// ================= TUNABLE CONSTANTS =================
+const START_MONEY        = 50;     // coins at the very start (enough for the first property)
+// price: cost to buy. rent: coins paid per cycle at level 1. cycle: seconds per rent payment.
+const PROPERTIES = [
+  { name: 'Studio flat',     emoji: '🏠', price: 50,      rent: 4,      cycle: 2 },
+  { name: 'Family house',    emoji: '🏡', price: 400,     rent: 30,     cycle: 4 },
+  { name: 'Corner shop',     emoji: '🏪', price: 3000,    rent: 220,    cycle: 6 },
+  { name: 'Apartment block', emoji: '🏢', price: 20000,   rent: 1500,   cycle: 8 },
+  { name: 'Hotel',           emoji: '🏨', price: 150000,  rent: 11000,  cycle: 12 },
+  { name: 'Skyscraper',      emoji: '🏙️', price: 1200000, rent: 90000,  cycle: 20 },
+];
+const UPGRADE_COST_MULT  = 0.6;    // first upgrade costs this × the buy price
+const UPGRADE_COST_GROWTH = 1.18;  // each further upgrade costs this much more
+const RENT_PER_LEVEL     = 1;      // extra rent per level, as a multiple of base rent
+const MILESTONES         = [10, 25, 50]; // levels that double that property's rent
+const OFFLINE_RATE       = 1.0;    // share of normal income earned while away (1 = 100%)
+const OFFLINE_CAP_HOURS  = 8;      // away earnings stop after this many hours
+const OFFLINE_MIN_SECONDS = 10;    // shorter absences don't show the welcome-back screen
+const SAVE_EVERY_SECONDS = 3;
+const SOUND_ON           = true;
+// =====================================================
+
+(() => {
+  const STORE = 'propertytycoon.v1';
+  const $ = id => document.getElementById(id);
+  const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
+  let ac = null;
+  function beep(freq, dur = 0.08, type = 'triangle', vol = 0.12) {
+    if (!SOUND_ON) return;
+    try { ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      const o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.value = freq; g.gain.value = vol;
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + dur); o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + dur);
+    } catch (e) {}
+  }
+  const chord = () => [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, .18), i * 80));
+  const fx = $('fx'), fctx = fx.getContext('2d'); let bits = [], fxOn = false;
+  function confetti(n = 140, coins) {
+    fx.width = innerWidth * devicePixelRatio; fx.height = innerHeight * devicePixelRatio; fctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    for (let i = 0; i < n; i++) bits.push({ x: innerWidth / 2, y: innerHeight * .45, vx: (Math.random() - .5) * 700, vy: -200 - Math.random() * 600, r: Math.random() * 6,
+      c: coins ? `hsl(${42 + Math.random() * 10},95%,${50 + Math.random() * 20}%)` : `hsl(${Math.random() * 360},90%,60%)`, life: 1.6 + Math.random(), round: coins });
+    if (fxOn) return; fxOn = true; let t0 = performance.now();
+    requestAnimationFrame(function step(now) { const dt = Math.min(.05, (now - t0) / 1000); t0 = now; fctx.clearRect(0, 0, innerWidth, innerHeight);
+      bits.forEach(b => { b.vy += 900 * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt; b.r += dt * 4; fctx.fillStyle = b.c;
+        if (b.round) { fctx.beginPath(); fctx.ellipse(b.x, b.y, 7, 7 * Math.abs(Math.cos(b.r)) + 1, 0, 0, Math.PI * 2); fctx.fill(); }
+        else fctx.fillRect(b.x, b.y, 7, 7 + Math.sin(b.r) * 4); });
+      bits = bits.filter(b => b.life > 0 && b.y < innerHeight + 20);
+      if (bits.length) requestAnimationFrame(step); else { fxOn = false; fctx.clearRect(0, 0, innerWidth, innerHeight); } });
+  }
+
+  // ---------- numbers ----------
+  function fmt(n) {
+    if (n < 1000) return Math.floor(n).toString();
+    const u = ['K', 'M', 'B', 'T', 'Qa', 'Qi']; let i = -1;
+    while (n >= 1000 && i < u.length - 1) { n /= 1000; i++; }
+    return (n < 10 ? n.toFixed(2) : n < 100 ? n.toFixed(1) : Math.floor(n)) + u[i];
+  }
+  const fmtTime = s => { s = Math.floor(s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
+    return h ? `${h}h ${m}m` : m ? `${m}m ${s % 60}s` : `${s}s`; };
+
+  // ---------- state ----------
+  const fresh = () => ({ money: START_MONEY, lifetime: 0, levels: PROPERTIES.map(() => 0), timers: PROPERTIES.map(() => 0), lastSeen: Date.now(), started: false });
+  let S;
+  function load() { try { const s = JSON.parse(localStorage.getItem(STORE)); if (s && s.levels) { s.levels = PROPERTIES.map((_, i) => s.levels[i] || 0); s.timers = PROPERTIES.map((_, i) => (s.timers || [])[i] || 0); return s; } } catch (e) {} return fresh(); }
+  function save() { S.lastSeen = Date.now(); try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) {} }
+
+  const rentOf = i => { const L = S.levels[i]; if (!L) return 0;
+    const mult = MILESTONES.filter(m => L >= m).length; return PROPERTIES[i].rent * (1 + (L - 1) * RENT_PER_LEVEL) * Math.pow(2, mult); };
+  const upgradeCost = i => Math.ceil(PROPERTIES[i].price * UPGRADE_COST_MULT * Math.pow(UPGRADE_COST_GROWTH, S.levels[i] - 1));
+  const costOf = i => S.levels[i] ? upgradeCost(i) : PROPERTIES[i].price;
+  const perSec = () => PROPERTIES.reduce((a, p, i) => a + rentOf(i) / p.cycle, 0);
+  const nextMilestone = L => MILESTONES.find(m => m > L);
+
+  function earn(n) { S.money += n; S.lifetime += n; }
+
+  // ---------- UI ----------
+  const cards = PROPERTIES.map((p, i) => {
+    const el = document.createElement('div'); el.className = 'prop';
+    el.innerHTML = `<div class="row1"><div class="emo">${p.emoji}</div><div class="info"><b>${p.name}</b><span class="rent"></span></div><div class="lvl"></div></div>
+      <div class="cyc"><div></div></div><button class="act"></button>`;
+    el.querySelector('button').addEventListener('click', () => buy(i));
+    $('list').appendChild(el); return el;
+  });
+
+  function renderCards() {
+    const owned = S.levels.filter(Boolean).length;
+    PROPERTIES.forEach((p, i) => {
+      const el = cards[i], L = S.levels[i], visible = i <= owned; // show owned + the next one to buy
+      el.style.display = i <= owned + 1 ? '' : 'none';
+      el.classList.toggle('locked', !visible);
+      const btn = el.querySelector('button');
+      if (!visible) {
+        el.querySelector('.emo').textContent = '🔒'; el.querySelector('b').textContent = '???';
+        el.querySelector('.rent').textContent = 'Buy the property above to unlock'; el.querySelector('.lvl').textContent = '';
+        btn.textContent = 'Locked'; btn.disabled = true; btn.className = 'act'; return;
+      }
+      el.querySelector('.emo').textContent = p.emoji; el.querySelector('b').textContent = p.name;
+      const ms = nextMilestone(L);
+      el.querySelector('.rent').textContent = L ? `🪙 ${fmt(rentOf(i))} every ${p.cycle}s` + (ms ? ` · ×2 at Lv ${ms}` : '')
+        : `Pays 🪙 ${fmt(p.rent)} every ${p.cycle}s`;
+      el.querySelector('.lvl').textContent = L ? 'Lv ' + L : 'For sale';
+      const c = costOf(i);
+      btn.textContent = L ? `Upgrade · 🪙 ${fmt(c)}` : `Buy · 🪙 ${fmt(c)}`;
+      btn.className = 'act' + (L ? ' up' : ''); btn.disabled = S.money < c;
+    });
+    // first-time hint: pulse the first buy button
+    cards[0].classList.toggle('hint', S.levels[0] === 0);
+  }
+  function renderTop() {
+    $('money').textContent = '🪙 ' + fmt(S.money);
+    $('rate').textContent = `+${fmt(perSec())} / sec`;
+    $('bestPill').textContent = 'Lifetime 🪙 ' + fmt(S.lifetime);
+  }
+
+  let bannerTimer;
+  function banner(t) { const b = $('banner'); b.textContent = t; b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
+    clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('show'), 1600); }
+
+  function buy(i) {
+    const c = costOf(i); if (S.money < c) return;
+    S.money -= c; const first = S.levels[i] === 0; S.levels[i]++;
+    const el = cards[i]; el.classList.remove('fresh'); void el.offsetWidth; el.classList.add('fresh');
+    if (first) { banner(`${PROPERTIES[i].emoji} You bought a ${PROPERTIES[i].name}!`); confetti(120); chord(); buzz(30); }
+    else if (MILESTONES.includes(S.levels[i])) { banner(`🔥 Lv ${S.levels[i]}: ${PROPERTIES[i].name} rent doubled!`); confetti(100); chord(); }
+    else { beep(520 + Math.min(S.levels[i], 40) * 10, .08); buzz(10); }
+    renderCards(); renderTop(); save();
+  }
+
+  function payout(i, amount) {
+    const el = cards[i], f = document.createElement('div'); f.className = 'float'; f.textContent = '+' + fmt(amount);
+    el.appendChild(f); setTimeout(() => f.remove(), 900);
+    const m = $('money'); m.classList.remove('bump'); void m.offsetWidth; m.classList.add('bump');
+  }
+
+  // ---------- loop ----------
+  let last = performance.now(), saveT = 0, uiT = 0, running = false;
+  function frame(now) {
+    const dt = Math.min(1, (now - last) / 1000); last = now;
+    if (running) {
+      PROPERTIES.forEach((p, i) => {
+        if (!S.levels[i]) return;
+        S.timers[i] += dt;
+        if (S.timers[i] >= p.cycle) { S.timers[i] -= p.cycle; const r = rentOf(i); earn(r); payout(i, r); if (i === 0 || Math.random() < .5) beep(880 + i * 60, .04, 'sine', .05); }
+        cards[i].querySelector('.cyc div').style.width = (S.timers[i] / p.cycle * 100) + '%';
+      });
+      uiT += dt; if (uiT > .15) { uiT = 0; renderTop(); renderCards(); }
+      saveT += dt; if (saveT > SAVE_EVERY_SECONDS) { saveT = 0; save(); }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- earnings while away ----------
+  let pendingAway = 0;
+  function checkAway() {
+    const away = (Date.now() - (S.lastSeen || Date.now())) / 1000;
+    if (!S.started || away < OFFLINE_MIN_SECONDS || perSec() <= 0) return false;
+    const capped = Math.min(away, OFFLINE_CAP_HOURS * 3600);
+    pendingAway = perSec() * capped * OFFLINE_RATE;
+    $('awayTime').textContent = `You were away ${fmtTime(away)}`;
+    $('awayAmt').textContent = '🪙 ' + fmt(pendingAway);
+    $('awayCap').textContent = away > capped ? `(Earnings stop after ${OFFLINE_CAP_HOURS}h away, so come back often!)` : '';
+    running = false; $('awayOv').classList.add('show'); return true;
+  }
+  $('collectBtn').addEventListener('click', () => {
+    earn(pendingAway); pendingAway = 0; $('awayOv').classList.remove('show');
+    confetti(160, true); chord(); buzz(30); running = true; last = performance.now(); renderTop(); renderCards(); save();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { if (running) save(); }
+    else if (S.started && !$('awayOv').classList.contains('show')) { if (!checkAway()) { last = performance.now(); } }
+  });
+  addEventListener('pagehide', () => { if (running) save(); });
+
+  $('startBtn').addEventListener('click', () => { S.started = true; save(); $('startOv').classList.remove('show'); running = true; last = performance.now(); });
+  $('resetBtn').addEventListener('click', () => { if (confirm('Reset all progress and start again?')) { S = fresh(); save(); location.reload(); } });
+
+  // test hook (read-only peek for the automated smoke test)
+  window.__tycoon = { get money() { return S.money; }, get levels() { return S.levels.slice(); }, get perSec() { return perSec(); }, get running() { return running; },
+    give(n) { S.money += n; renderCards(); renderTop(); },
+    leave(seconds) { save(); running = false; S.lastSeen = Date.now() - seconds * 1000; localStorage.setItem(STORE, JSON.stringify(S)); } };
+
+  // ---------- boot ----------
+  S = load(); renderCards(); renderTop();
+  if (!S.started) $('startOv').classList.add('show');
+  else if (!checkAway()) running = true;
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

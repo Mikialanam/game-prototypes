@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0f1222">
+<title>Glow Grid · Daily Puzzle</title>
+<style>
+  :root {
+    --bg: #0f1222; --panel: #1a1f38; --text: #eef0ff; --muted: #9aa0c3;
+    --on: #ffd23f; --on-glow: rgba(255,210,63,.55); --off: #262c4d; --accent: #5ad1a4; --danger: #ff6b6b;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  body { display: flex; flex-direction: column; min-height: 100dvh; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 4px; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: .5px; }
+  .pill { background: var(--panel); border-radius: 999px; padding: 6px 12px; font-size: 14px; font-weight: 600; }
+  main { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 6px 16px; gap: 10px; }
+  .sub { color: var(--muted); font-size: 14px; text-align: center; margin: 0; }
+  .stats { display: flex; gap: 10px; width: 100%; max-width: 420px; }
+  .stat { flex: 1; background: var(--panel); border-radius: 12px; padding: 8px; text-align: center; }
+  .stat b { display: block; font-size: 22px; }
+  .stat span { font-size: 12px; color: var(--muted); }
+  #grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; width: min(92vw, 420px, 50dvh); aspect-ratio: 1; }
+  .cell { border: 0; border-radius: 14px; background: var(--off); transition: background .15s, box-shadow .15s, transform .08s; }
+  .cell.on { background: var(--on); box-shadow: 0 0 18px var(--on-glow); }
+  .cell:active { transform: scale(.94); }
+  .row { display: flex; gap: 10px; width: 100%; max-width: 420px; }
+  button.btn { flex: 1; min-height: 52px; border: 0; border-radius: 14px; font-size: 17px; font-weight: 700;
+    background: var(--panel); color: var(--text); }
+  button.primary { background: var(--accent); color: #08261b; }
+  .ad { height: 60px; margin: 8px 16px calc(8px + env(safe-area-inset-bottom)); border: 2px dashed #4a5180; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; text-align: center; }
+  .overlay { position: fixed; inset: 0; background: rgba(5,7,18,.85); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+  .overlay.show { display: flex; }
+  .card { background: var(--panel); border-radius: 18px; padding: 20px; width: 100%; max-width: 400px; text-align: center; }
+  .card h2 { margin: 0 0 6px; }
+  .stars { font-size: 36px; letter-spacing: 4px; margin: 6px 0; }
+  .big { font-size: 40px; font-weight: 800; margin: 4px 0; }
+  .countdown { font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 15px; }
+  td { padding: 8px 6px; border-bottom: 1px solid #2c3358; text-align: left; }
+  td:last-child { text-align: right; font-weight: 700; }
+  tr.you td { color: var(--on); }
+  .demo { background: var(--danger); color: #2b0606; font-weight: 800; font-size: 12px; border-radius: 6px; padding: 3px 8px; display: inline-block; }
+  .fine { font-size: 12px; color: var(--muted); margin: 8px 0 12px; }
+  .help { font-size: 15px; line-height: 1.45; text-align: left; }
+</style>
+</head>
+<body>
+<header>
+  <h1>✦ Glow Grid</h1>
+  <div class="pill" id="streakPill">🔥 0</div>
+</header>
+<main>
+  <p class="sub" id="puzzleLabel">Daily puzzle</p>
+  <div class="stats">
+    <div class="stat"><b id="moves">0</b><span>moves</span></div>
+    <div class="stat"><b id="par">0</b><span>par</span></div>
+    <div class="stat"><b id="lit">0</b><span>still lit</span></div>
+  </div>
+  <div id="grid" aria-label="puzzle grid"></div>
+  <p class="sub">Tap a tile to flip it and its 4 neighbours. Turn every light off.</p>
+  <div class="row">
+    <button class="btn" id="resetBtn">↺ Restart</button>
+    <button class="btn" id="helpBtn">? How</button>
+    <button class="btn" id="prizeBtn">🏆 Prizes</button>
+  </div>
+</main>
+<div class="ad" aria-label="advertisement placeholder">AD PLACEHOLDER · 320×50 banner<br>No ad network connected</div>
+
+<!-- Result -->
+<div class="overlay" id="resultOv">
+  <div class="card">
+    <h2 id="resTitle">Solved!</h2>
+    <div class="stars" id="resStars">★★★</div>
+    <div class="big" id="resMoves">0</div>
+    <p class="sub" id="resPar">moves · par 0</p>
+    <p class="sub" style="margin-top:10px">🔥 Streak: <b id="resStreak">0</b> <span id="resDays">days</span> · Best: <b id="resBest">0</b></p>
+    <p class="sub" id="nextWrap">Next puzzle in <span class="countdown" id="countdown">--:--:--</span></p>
+    <div class="row" style="margin-top:14px">
+      <button class="btn" id="shareBtn">Copy result</button>
+      <button class="btn primary" id="practiceBtn">Practice puzzle</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" id="prizeBtn2">🏆 Prize pool</button>
+      <button class="btn" id="closeRes">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Prize pool (placeholder) -->
+<div class="overlay" id="prizeOv">
+  <div class="card">
+    <span class="demo">DEMO · NOT REAL MONEY</span>
+    <h2 style="margin-top:10px">Today's prize pool</h2>
+    <p class="sub">Fewest moves on today's puzzle (example)</p>
+    <table id="prizeTable"></table>
+    <p class="fine">Prototype only. No payments, no entry fees, no real prizes. Any real reward scheme must be reviewed by a lawyer first.</p>
+    <button class="btn primary" style="width:100%" id="closePrize">Close</button>
+  </div>
+</div>
+
+<!-- Help -->
+<div class="overlay" id="helpOv">
+  <div class="card">
+    <h2>How to play</h2>
+    <div class="help">
+      <p>Tapping a tile flips it <b>and</b> the tiles above, below, left and right of it.</p>
+      <p>Switch <b>every</b> light off. Try to match or beat <b>par</b> for 3 stars.</p>
+      <p>Everyone gets the same puzzle each day. Solve daily to keep your 🔥 streak.</p>
+    </div>
+    <button class="btn primary" style="width:100%" id="closeHelp">Got it</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const N = 5;
+  const STORE = 'glowgrid.v1';
+  const EPOCH = new Date(2026, 0, 1);
+
+  // ---------- storage (never throws) ----------
+  function load() { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch (e) { return {}; } }
+  function save(s) { try { localStorage.setItem(STORE, JSON.stringify(s)); } catch (e) {} }
+
+  // ---------- dates ----------
+  const pad = n => String(n).padStart(2, '0');
+  const keyOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const todayKey = () => keyOf(new Date());
+  const yesterdayKey = () => { const d = new Date(); d.setDate(d.getDate() - 1); return keyOf(d); };
+  const puzzleNo = () => {
+    const t = new Date(); t.setHours(0, 0, 0, 0);
+    return Math.round((t - EPOCH) / 86400000) + 1;
+  };
+
+  // ---------- seeded RNG ----------
+  function hash(str) { let h = 2166136261; for (const c of str) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+  function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+  // Build a puzzle by pressing `par` distinct cells on a blank board -> always solvable.
+  function makePuzzle(seedStr) {
+    const rnd = mulberry32(hash(seedStr));
+    const par = 5 + Math.floor(rnd() * 4); // 5..8
+    const board = new Array(N * N).fill(false);
+    const idx = [...Array(N * N).keys()];
+    for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+    idx.slice(0, par).forEach(i => press(board, i));
+    if (board.every(v => !v)) press(board, 12); // degenerate safety
+    return { board, par };
+  }
+  function press(board, i) {
+    const r = Math.floor(i / N), c = i % N;
+    [[0,0],[1,0],[-1,0],[0,1],[0,-1]].forEach(([dr, dc]) => {
+      const rr = r + dr, cc = c + dc;
+      if (rr >= 0 && rr < N && cc >= 0 && cc < N) board[rr * N + cc] = !board[rr * N + cc];
+    });
+  }
+
+  // ---------- state ----------
+  let mode = 'daily';   // 'daily' | 'practice'
+  let start, board, par, moves = 0, solved = false;
+  const $ = id => document.getElementById(id);
+  const gridEl = $('grid');
+  const cells = [];
+  for (let i = 0; i < N * N; i++) {
+    const b = document.createElement('button');
+    b.className = 'cell'; b.setAttribute('aria-label', 'tile ' + (i + 1));
+    b.addEventListener('click', () => tap(i));
+    gridEl.appendChild(b); cells.push(b);
+  }
+
+  function currentStreak(s) {
+    if (!s.lastSolved) return 0;
+    return (s.lastSolved === todayKey() || s.lastSolved === yesterdayKey()) ? (s.streak || 0) : 0;
+  }
+
+  function setup(newMode, seed) {
+    mode = newMode;
+    const p = makePuzzle(seed);
+    start = p.board.slice(); board = p.board.slice(); par = p.par; moves = 0; solved = false;
+    $('puzzleLabel').textContent = mode === 'daily' ? `Daily puzzle #${puzzleNo()} · same for everyone` : 'Practice puzzle · does not affect streak';
+    render();
+  }
+
+  function render() {
+    board.forEach((on, i) => cells[i].classList.toggle('on', on));
+    $('moves').textContent = moves;
+    $('par').textContent = par;
+    $('lit').textContent = board.filter(Boolean).length;
+    $('streakPill').textContent = '🔥 ' + currentStreak(load());
+  }
+
+  function tap(i) {
+    if (solved) return;
+    press(board, i); moves++;
+    try { navigator.vibrate && navigator.vibrate(8); } catch (e) {}
+    render();
+    if (board.every(v => !v)) win();
+  }
+
+  function starsFor(m) { return m <= par ? 3 : m <= par + 4 ? 2 : 1; }
+
+  function win() {
+    solved = true;
+    const s = load();
+    if (mode === 'daily') {
+      const t = todayKey();
+      if (s.lastSolved !== t) {
+        s.streak = s.lastSolved === yesterdayKey() ? (s.streak || 0) + 1 : 1;
+        s.bestStreak = Math.max(s.bestStreak || 0, s.streak);
+        s.lastSolved = t;
+        s.history = s.history || {};
+        s.history[t] = moves;
+        save(s);
+      }
+    }
+    setTimeout(() => showResult(mode === 'daily' ? load().history[todayKey()] : moves), 250);
+  }
+
+  function showResult(m) {
+    const s = load();
+    const st = starsFor(m);
+    $('resTitle').textContent = mode === 'daily' ? `Puzzle #${puzzleNo()} solved!` : 'Practice solved!';
+    $('resStars').textContent = '★'.repeat(st) + '☆'.repeat(3 - st);
+    $('resMoves').textContent = m;
+    $('resPar').textContent = `moves · par ${par}`;
+    $('resStreak').textContent = currentStreak(s);
+    $('resDays').textContent = currentStreak(s) === 1 ? 'day' : 'days';
+    $('resBest').textContent = s.bestStreak || 0;
+    $('shareBtn').style.display = mode === 'daily' ? '' : 'none';
+    $('resultOv').classList.add('show');
+    render();
+  }
+
+  // ---------- countdown to local midnight ----------
+  function tick() {
+    const now = new Date(), next = new Date(now); next.setHours(24, 0, 0, 0);
+    let s = Math.max(0, Math.floor((next - now) / 1000));
+    $('countdown').textContent = `${pad(Math.floor(s / 3600))}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`;
+    if (s === 0 && mode === 'daily') location.reload();
+  }
+  setInterval(tick, 1000); tick();
+
+  // ---------- share (copies text to clipboard only) ----------
+  $('shareBtn').addEventListener('click', async () => {
+    const m = load().history?.[todayKey()];
+    const st = starsFor(m);
+    const text = `Glow Grid #${puzzleNo()} ${'★'.repeat(st)}${'☆'.repeat(3 - st)}\n${m} moves (par ${par}) · 🔥${currentStreak(load())}`;
+    try { await navigator.clipboard.writeText(text); $('shareBtn').textContent = 'Copied!'; }
+    catch (e) { $('shareBtn').textContent = 'Copy failed'; }
+    setTimeout(() => $('shareBtn').textContent = 'Copy result', 1500);
+  });
+
+  // ---------- prize pool (placeholder) ----------
+  function showPrize() {
+    const s = load();
+    const mine = s.history?.[todayKey()];
+    const rows = [['Ava K.', par], ['Jun P.', par + 1], ['Sam R.', par + 1], ['Leo T.', par + 2], ['Mia D.', par + 3]];
+    if (mine != null) rows.push(['You', mine]);
+    rows.sort((a, b) => a[1] - b[1]);
+    const prize = ['$10', '$5', '$1', '$1', '$1'];
+    $('prizeTable').innerHTML = rows.slice(0, 6).map((r, i) =>
+      `<tr class="${r[0] === 'You' ? 'you' : ''}"><td>${i + 1}. ${r[0]} · ${r[1]} moves</td><td>${prize[i] || '—'}</td></tr>`).join('') +
+      (mine == null ? '<tr><td colspan="2" style="color:var(--muted)">Solve today\'s puzzle to see your spot</td></tr>' : '');
+    $('prizeOv').classList.add('show');
+  }
+  $('prizeBtn').addEventListener('click', showPrize);
+  $('prizeBtn2').addEventListener('click', () => { $('resultOv').classList.remove('show'); showPrize(); });
+  $('closePrize').addEventListener('click', () => $('prizeOv').classList.remove('show'));
+
+  // ---------- buttons ----------
+  $('resetBtn').addEventListener('click', () => {
+    if (solved && mode === 'daily') { showResult(load().history[todayKey()]); return; }
+    board = start.slice(); moves = 0; solved = false; render();
+  });
+  $('practiceBtn').addEventListener('click', () => { $('resultOv').classList.remove('show'); setup('practice', 'practice-' + Date.now()); });
+  $('closeRes').addEventListener('click', () => $('resultOv').classList.remove('show'));
+  $('helpBtn').addEventListener('click', () => $('helpOv').classList.add('show'));
+  $('closeHelp').addEventListener('click', () => { $('helpOv').classList.remove('show'); const s = load(); s.seenHelp = true; save(s); });
+
+  // ---------- boot ----------
+  setup('daily', 'glowgrid-' + todayKey());
+  const s0 = load();
+  if (s0.history && s0.history[todayKey()] != null) {
+    // Already solved today: show the finished board and the result.
+    board = new Array(N * N).fill(false); solved = true; render();
+    showResult(s0.history[todayKey()]);
+  } else if (!s0.seenHelp) {
+    $('helpOv').classList.add('show');
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0f2236">
+<title>Merge a City</title>
+<style>
+  :root { --bg: #0f2236; --panel: #1a3550; --cell: #234567; --text: #eef6ff; --muted: #9db6cf; --accent: #3ddc97; --gold: #ffd54d; --bad: #ff6b6b; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; touch-action: none; user-select: none; -webkit-user-select: none; }
+  body { display: flex; flex-direction: column; height: 100dvh; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px 4px; }
+  h1 { font-size: 20px; margin: 0; }
+  .pill { background: var(--panel); border-radius: 999px; padding: 6px 12px; font-size: 14px; font-weight: 700; }
+  main { flex: 1; display: flex; flex-direction: column; gap: 10px; padding: 6px 16px calc(16px + env(safe-area-inset-bottom)); max-width: 480px; width: 100%; margin: 0 auto; }
+  .stats { display: flex; justify-content: space-between; align-items: flex-end; }
+  #score { font-size: 36px; font-weight: 800; line-height: 1; } .lbl { font-size: 12px; color: var(--muted); }
+  #topB { text-align: right; } #topB b { font-size: 16px; }
+  .bar { height: 10px; background: var(--panel); border-radius: 99px; overflow: hidden; }
+  #spawnFill { height: 100%; width: 0; background: var(--accent); }
+  #hint { text-align: center; font-size: 14px; color: var(--muted); min-height: 18px; }
+  #grid { display: grid; gap: 6px; aspect-ratio: 1; width: min(100%, calc(100dvh - 250px)); margin: 0 auto; position: relative; }
+  .cell { min-width: 0; min-height: 0; background: var(--cell); border-radius: 12px; position: relative; display: flex; align-items: flex-end; justify-content: center; overflow: visible; }
+  .cell.sel { outline: 3px solid var(--gold); }
+  .cell.match { box-shadow: inset 0 0 0 3px rgba(61,220,151,.7); }
+  .cell svg { width: 88%; height: 88%; pointer-events: none; }
+  .cell.spawn svg { animation: drop .35s ease-out; }
+  .cell.merged svg { animation: mpop .45s ease-out; }
+  @keyframes drop { from { transform: translateY(-30px) scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes mpop { 0% { transform: scale(.3); } 60% { transform: scale(1.3); } 100% { transform: scale(1); } }
+  .cell .lv { position: absolute; top: 3px; left: 6px; font-size: 11px; font-weight: 800; color: rgba(255,255,255,.55); }
+  #ghost { position: fixed; width: 70px; height: 70px; pointer-events: none; z-index: 5; display: none; transform: translate(-50%, -60%) scale(1.15); filter: drop-shadow(0 8px 10px rgba(0,0,0,.4)); }
+  .float { position: fixed; font-weight: 800; font-size: 20px; color: var(--gold); pointer-events: none; z-index: 6; animation: floatUp .9s ease-out forwards; transform: translateX(-50%); }
+  @keyframes floatUp { from { opacity: 1; margin-top: 0; } to { opacity: 0; margin-top: -50px; } }
+  .ladder { display: flex; align-items: flex-end; justify-content: center; gap: 2px; margin: 12px 0; }
+  .ladder div { width: 54px; text-align: center; font-size: 10px; color: var(--muted); } .ladder svg { width: 50px; height: 50px; }
+  .ladder i { font-style: normal; color: var(--accent); font-weight: 800; padding-bottom: 22px; }
+  .overlay { position: fixed; inset: 0; background: rgba(6,14,24,.88); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+  .overlay.show { display: flex; }
+  .card { background: var(--panel); border-radius: 22px; padding: 22px 18px; width: 100%; max-width: 400px; text-align: center; }
+  .card h2 { margin: 0 0 6px; font-size: 28px; }
+  .rule { font-size: 18px; line-height: 1.4; margin: 8px 0; }
+  .sub { color: var(--muted); font-size: 14px; margin: 6px 0; }
+  .big { font-size: 64px; font-weight: 800; margin: 0; line-height: 1.1; }
+  .newbest { color: var(--gold); font-weight: 800; letter-spacing: 1px; min-height: 22px; font-size: 18px; }
+  .newbest.on { animation: mpop .6s ease-out; }
+  button.btn { width: 100%; min-height: 64px; border: 0; border-radius: 16px; font-size: 20px; font-weight: 800; margin-top: 12px;
+    background: var(--accent); color: #032a1a; box-shadow: 0 6px 0 #22a26c; }
+  button.btn:active { transform: translateY(3px); box-shadow: 0 3px 0 #22a26c; }
+  #banner { position: fixed; left: 0; right: 0; margin: 0 auto; width: fit-content; top: 30%; background: var(--gold); color: #3a2a00; font-weight: 800; font-size: 22px;
+    padding: 12px 20px; border-radius: 14px; z-index: 8; display: none; white-space: nowrap; box-shadow: 0 8px 20px rgba(0,0,0,.4); }
+  #banner.show { display: block; animation: mpop .5s ease-out; }
+  #fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏙️ Merge a City</h1>
+  <div class="pill" id="bestPill">Best 0</div>
+</header>
+<main>
+  <div class="stats">
+    <div><div id="score">0</div><div class="lbl">points</div></div>
+    <div id="topB"><div class="lbl">tallest building</div><b id="tallest">House</b></div>
+  </div>
+  <div><div class="lbl" style="margin-bottom:4px">next house arrives</div><div class="bar"><div id="spawnFill"></div></div></div>
+  <div id="grid"></div>
+  <div id="hint">Drag a building onto a matching one</div>
+</main>
+<div id="ghost"></div>
+<div id="banner"></div>
+
+<div class="overlay show" id="startOv">
+  <div class="card">
+    <h2>🏙️ Merge a City</h2>
+    <p class="rule"><b>Drag</b> two matching buildings together to build the next one up.</p>
+    <div class="ladder" id="ladder"></div>
+    <p class="rule">New houses keep arriving. Don't let the city <b style="color:var(--bad)">fill up</b>!</p>
+    <button class="btn" id="startBtn">Start</button>
+  </div>
+</div>
+
+<div class="overlay" id="overOv">
+  <div class="card">
+    <h2>City full!</h2>
+    <p class="sub">Points</p>
+    <p class="big" id="oScore">0</p>
+    <div class="newbest" id="oNew"></div>
+    <p class="sub" id="oTall"></p>
+    <p class="sub" id="oBest"></p>
+    <button class="btn" id="againBtn">Play again</button>
+  </div>
+</div>
+<canvas id="fx"></canvas>
+
+<script>
+// ================= TUNABLE CONSTANTS =================
+const GRID_SIZE        = 5;     // grid is GRID_SIZE x GRID_SIZE
+const START_HOUSES     = 4;     // houses on the board at the start
+const SPAWN_START      = 2.4;   // seconds between new houses at the start
+const SPAWN_SPEEDUP    = 0.97;  // spawn gap multiplier after each new house (smaller = ramps faster)
+const SPAWN_MIN        = 0.9;   // fastest spawn gap, seconds
+// The building ladder. Merging two of one level makes one of the next. points = score for making it.
+const BUILDINGS = [
+  { name: 'House',      points: 0 },
+  { name: 'Apartment',  points: 10 },
+  { name: 'Tower',      points: 40 },
+  { name: 'Skyscraper', points: 150 },
+  { name: 'Landmark',   points: 500 },
+];
+const DRAG_THRESHOLD   = 8;     // px a finger must move before a press becomes a drag
+const SOUND_ON         = true;
+// =====================================================
+
+(() => {
+  const STORE = 'mergecity.v1';
+  const $ = id => document.getElementById(id);
+  const load = () => { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch (e) { return {}; } };
+  const save = s => { try { localStorage.setItem(STORE, JSON.stringify(s)); } catch (e) {} };
+  const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
+  let ac = null;
+  function beep(freq, dur = 0.08, type = 'triangle', vol = 0.15) {
+    if (!SOUND_ON) return;
+    try { ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      const o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.value = freq; g.gain.value = vol;
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + dur); o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + dur);
+    } catch (e) {}
+  }
+  const chord = () => [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, .18), i * 80));
+  const fx = $('fx'), fctx = fx.getContext('2d'); let bits = [], fxOn = false;
+  function confetti(n = 140, x = innerWidth / 2, y = innerHeight * .4) {
+    fx.width = innerWidth * devicePixelRatio; fx.height = innerHeight * devicePixelRatio; fctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    for (let i = 0; i < n; i++) bits.push({ x, y, vx: (Math.random() - .5) * 700, vy: -200 - Math.random() * 600, r: Math.random() * 6, c: `hsl(${Math.random() * 360},90%,60%)`, life: 1.6 + Math.random() });
+    if (fxOn) return; fxOn = true; let t0 = performance.now();
+    requestAnimationFrame(function step(now) { const dt = Math.min(.05, (now - t0) / 1000); t0 = now; fctx.clearRect(0, 0, innerWidth, innerHeight);
+      bits.forEach(b => { b.vy += 900 * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt; b.r += dt * 4; fctx.fillStyle = b.c; fctx.fillRect(b.x, b.y, 7, 7 + Math.sin(b.r) * 4); });
+      bits = bits.filter(b => b.life > 0 && b.y < innerHeight + 20);
+      if (bits.length) requestAnimationFrame(step); else { fxOn = false; fctx.clearRect(0, 0, innerWidth, innerHeight); } });
+  }
+
+  // ---------- building art (SVG, grows taller each level) ----------
+  function art(lv) {
+    const win = (x, y, cols, rows, w, h, gx, gy, c) => { let s = ''; for (let r = 0; r < rows; r++) for (let k = 0; k < cols; k++) s += `<rect x="${x + k * gx}" y="${y + r * gy}" width="${w}" height="${h}" rx="1" fill="${c}"/>`; return s; };
+    const svgs = [
+      // House
+      `<rect x="26" y="62" width="48" height="36" fill="#ffb86b"/><path d="M20 64 L50 38 L80 64 Z" fill="#e0533d"/><rect x="44" y="76" width="12" height="22" fill="#7a4b2a"/><rect x="30" y="70" width="10" height="9" fill="#cfefff"/><rect x="60" y="70" width="10" height="9" fill="#cfefff"/>`,
+      // Apartment
+      `<rect x="24" y="38" width="52" height="60" rx="2" fill="#7fc6a4"/><rect x="22" y="34" width="56" height="6" fill="#4f9c79"/>` + win(30, 46, 3, 4, 9, 8, 15, 12, '#e8fff4') + `<rect x="44" y="86" width="12" height="12" fill="#2f6b50"/>`,
+      // Tower
+      `<rect x="30" y="20" width="40" height="78" rx="2" fill="#6aa8ff"/><rect x="34" y="14" width="32" height="8" fill="#4a83d6"/>` + win(35, 26, 3, 7, 7, 7, 11, 10, '#e6f1ff'),
+      // Skyscraper
+      `<rect x="49" y="2" width="2" height="10" fill="#cfd8e6"/><path d="M38 14 L62 14 L66 98 L34 98 Z" fill="#8e9bff"/><rect x="40" y="12" width="20" height="4" fill="#6c78e0"/>` + win(41, 20, 3, 10, 5, 5, 7, 7.6, '#f0f2ff'),
+      // Landmark
+      `<path d="M50 0 L53 14 L47 14 Z" fill="#fff6c2"/><path d="M42 16 L58 16 L64 98 L36 98 Z" fill="#ffd54d"/><path d="M44 16 L56 16 L58 40 L42 40 Z" fill="#ffe792"/>` + win(43, 44, 3, 7, 4, 4, 6, 7.4, '#8a6400') + `<circle cx="50" cy="8" r="3" fill="#fff"/>`,
+    ];
+    return `<svg viewBox="0 0 100 100" aria-label="${BUILDINGS[lv].name}">${svgs[Math.min(lv, svgs.length - 1)]}</svg>`;
+  }
+  $('ladder').innerHTML = BUILDINGS.slice(0, 4).map((b, i) => `<div>${art(i)}<br>${b.name}</div>`).join('<i>→</i>');
+
+  // ---------- state ----------
+  const N = GRID_SIZE * GRID_SIZE;
+  let phase = 'menu', grid, score, tallest, spawnGap, spawnT, last, sel = null, drag = null;
+  const cells = [];
+  $('grid').style.gridTemplateColumns = $('grid').style.gridTemplateRows = `repeat(${GRID_SIZE}, 1fr)`;
+  for (let i = 0; i < N; i++) { const c = document.createElement('div'); c.className = 'cell'; c.dataset.i = i; $('grid').appendChild(c); cells.push(c); }
+
+  function render(i, cls) {
+    const c = cells[i], v = grid[i];
+    c.innerHTML = v == null ? '' : art(v) + `<span class="lv">${v + 1}</span>`;
+    c.classList.remove('spawn', 'merged'); if (cls) { void c.offsetWidth; c.classList.add(cls); }
+  }
+  const renderAll = () => { for (let i = 0; i < N; i++) render(i); };
+  const empties = () => grid.map((v, i) => v == null ? i : -1).filter(i => i >= 0);
+
+  function start() {
+    grid = new Array(N).fill(null); score = 0; tallest = 0; spawnGap = SPAWN_START; spawnT = spawnGap; sel = null;
+    renderAll(); for (let k = 0; k < START_HOUSES; k++) spawnHouse(true);
+    $('score').textContent = '0'; $('tallest').textContent = BUILDINGS[0].name;
+    ['startOv', 'overOv'].forEach(id => $(id).classList.remove('show'));
+    phase = 'play'; last = performance.now(); requestAnimationFrame(tick);
+  }
+
+  function spawnHouse(quiet) {
+    const e = empties(); if (!e.length) return false;
+    const i = e[Math.floor(Math.random() * e.length)]; grid[i] = 0; render(i, 'spawn');
+    if (!quiet) beep(300, .04, 'sine', .08);
+    return true;
+  }
+
+  function tick(now) {
+    if (phase !== 'play') return;
+    const dt = Math.min(.1, (now - last) / 1000); last = now;
+    spawnT -= dt;
+    if (spawnT <= 0) {
+      if (!spawnHouse()) return gameOver();
+      spawnGap = Math.max(SPAWN_MIN, spawnGap * SPAWN_SPEEDUP); spawnT = spawnGap;
+    }
+    const full = empties().length === 0;
+    $('spawnFill').style.width = (100 - spawnT / spawnGap * 100) + '%';
+    $('spawnFill').style.background = full ? 'var(--bad)' : 'var(--accent)';
+    $('hint').textContent = full ? '⚠️ City is full: merge something now!' : 'Drag a building onto a matching one';
+    $('hint').style.color = full ? 'var(--bad)' : '';
+    requestAnimationFrame(tick);
+  }
+
+  function tryMove(from, to) {
+    if (from === to || grid[from] == null) return false;
+    if (grid[to] == null) { grid[to] = grid[from]; grid[from] = null; render(from); render(to); beep(380, .04, 'sine', .06); return true; }
+    if (grid[to] === grid[from] && grid[to] < BUILDINGS.length - 1) { merge(from, to); return true; }
+    // not a match: little shake
+    cells[to].animate([{ transform: 'translateX(-5px)' }, { transform: 'translateX(5px)' }, { transform: 'none' }], { duration: 180 });
+    buzz(20); return false;
+  }
+
+  function merge(from, to) {
+    const lv = grid[to] + 1; grid[to] = lv; grid[from] = null; render(from); render(to, 'merged');
+    score += BUILDINGS[lv].points; $('score').textContent = score;
+    const r = cells[to].getBoundingClientRect();
+    floatText(`+${BUILDINGS[lv].points}`, r.left + r.width / 2, r.top);
+    beep(440 + lv * 120, .14); buzz(15);
+    confetti(lv * 8, r.left + r.width / 2, r.top + r.height / 2);
+    if (lv > tallest) {
+      tallest = lv; $('tallest').textContent = BUILDINGS[lv].name;
+      const firstEver = lv > (load().tallest || 0);
+      showBanner(`${firstEver ? '🎉 First ever' : '🏗️ New'}: ${BUILDINGS[lv].name}!`);
+      if (lv >= 2) { confetti(120); chord(); }
+      if (firstEver) { const s = load(); s.tallest = lv; save(s); }
+    }
+  }
+
+  function floatText(t, x, y) { const el = document.createElement('div'); el.className = 'float'; el.textContent = t; el.style.left = x + 'px'; el.style.top = y + 'px';
+    document.body.appendChild(el); setTimeout(() => el.remove(), 900); }
+  let bannerTimer;
+  function showBanner(t) { const b = $('banner'); b.textContent = t; b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
+    clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('show'), 1400); }
+
+  function gameOver() {
+    phase = 'over'; buzz([40, 40, 80]); beep(140, .35, 'square', .08);
+    const s = load(); const isBest = score > (s.best || 0); if (isBest) s.best = score; save(s);
+    $('oScore').textContent = score;
+    $('oTall').textContent = `Tallest this round: ${BUILDINGS[tallest].name} · ever: ${BUILDINGS[s.tallest || 0].name}`;
+    $('oBest').textContent = 'Best ' + (s.best || 0);
+    const nb = $('oNew'); nb.classList.remove('on'); void nb.offsetWidth; nb.textContent = isBest && score > 0 ? '★ NEW BEST ★' : '';
+    setTimeout(() => { $('overOv').classList.add('show'); if (isBest && score > 0) { nb.classList.add('on'); confetti(); chord(); } }, 400);
+    updatePill();
+  }
+  const updatePill = () => $('bestPill').textContent = 'Best ' + (load().best || 0);
+
+  // ---------- input: drag (or tap one, then tap its match) ----------
+  const cellAt = (x, y) => { const el = document.elementFromPoint(x, y); const c = el && el.closest && el.closest('.cell'); return c ? +c.dataset.i : -1; };
+  function highlight(lv) { cells.forEach((c, i) => c.classList.toggle('match', lv != null && grid[i] === lv && lv < BUILDINGS.length - 1)); }
+  $('grid').addEventListener('pointerdown', e => {
+    if (phase !== 'play') return; e.preventDefault();
+    const i = cellAt(e.clientX, e.clientY); if (i < 0) return;
+    if (sel != null && sel !== i) { // second tap
+      const from = sel; sel = null; cells[from].classList.remove('sel'); highlight(null);
+      if (grid[i] != null && grid[i] !== grid[from]) { /* tapped a different building: select it instead */ }
+      else { tryMove(from, i); return; }
+    }
+    if (grid[i] == null) return;
+    drag = { from: i, x0: e.clientX, y0: e.clientY, moving: false };
+    try { $('grid').setPointerCapture(e.pointerId); } catch (err) {}
+  });
+  addEventListener('pointermove', e => {
+    if (!drag) return;
+    if (!drag.moving && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > DRAG_THRESHOLD) {
+      drag.moving = true; const g = $('ghost'); g.innerHTML = art(grid[drag.from]); g.style.display = 'block';
+      cells[drag.from].style.opacity = .35; highlight(grid[drag.from]);
+      if (sel != null) { cells[sel].classList.remove('sel'); sel = null; }
+    }
+    if (drag.moving) { const g = $('ghost'); g.style.left = e.clientX + 'px'; g.style.top = e.clientY + 'px'; }
+  });
+  addEventListener('pointerup', e => {
+    if (!drag) return; const d = drag; drag = null;
+    $('ghost').style.display = 'none'; cells[d.from].style.opacity = ''; highlight(null);
+    if (phase !== 'play') return;
+    if (d.moving) { const to = cellAt(e.clientX, e.clientY); if (to >= 0) tryMove(d.from, to); }
+    else { sel = d.from; cells[sel].classList.add('sel'); highlight(grid[sel]); cells[sel].classList.remove('match'); }
+  });
+
+  $('startBtn').addEventListener('click', start);
+  $('againBtn').addEventListener('click', start);
+
+  // test hook (read-only peek for the automated smoke test)
+  window.__city = { get phase() { return phase; }, get grid() { return grid.slice(); },
+    centre(i) { const r = cells[i].getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; } };
+
+  grid = new Array(N).fill(null); updatePill();
+})();
+</script>
+</body>
+</html>
