@@ -1,5 +1,36 @@
 # Run progress
 
+Run started 2026-11-18 06:13 UTC. Brief: **City Hall Game**: three phone prototypes of Faizan's political strategy game (Mayor's Desk, Contract Hustle with Miki's business-owner angle, Street Clash), to play before Faizan and Miki meet.
+
+Working branch: `claude/laughing-cray-tbzkbv`, merged with the GitHub Pages branch `claude/intelligent-lamport-sbfavc` so the Pages branch can fast-forward to it. Each step is pushed to both.
+
+Stay on scope: only the three City Hall games this run.
+
+## Plan (this run)
+
+| # | Step | Estimate | Status |
+|---|---|---|---|
+| 1 | Merge Pages branch; write this plan | 10 min | done |
+| 2 | Mayor's Desk: 10 requests, budget, groups, dirty tricks, daily crisis, election; quick phone check; README | 30 min | next |
+| 3 | Contract Hustle: 10 bid rounds, influence moves, computer mayor reacts to opinion; quick phone check; README | 30 min | |
+| 4 | Street Clash: pick protester or police, 60s levels, slapstick only, opinion meter; quick phone check; README | 30 min | |
+| 5 | Smoke test all three on emulated phones (`tools/smoke-city-hall.js`), check screenshots, fix layout | 30 min | |
+| 6 | Home page "New", RATING-SHEET.md rows, RUN-LOG.md note; final report | 20 min | |
+
+Shared rules for all three: made-up city (Port Halden) and parties, even-handed satire, single player, phone portrait, Public Opinion meter 0–100, ~5-minute term, daily crisis seeded by date, credits with buy/ad placeholders that never win outright, tunable constants, `SOUND_ON`, best score in localStorage.
+
+## Later (not this run)
+- More roles in the same city (protester leader, police chief, campaign funder) and multiplayer where each friend plays one part.
+- Shared save between the three games (e.g. Contract Hustle's mayor is the one you played in Mayor's Desk).
+
+## Log
+- 06:13 Read progress and commits. Pages branch had City Builder etc.; merged into this branch (clean).
+
+---
+
+# Previous run (2026-11-18 03:30 UTC)
+
+
 Run started 2026-11-18 03:30 UTC (resuming the run of 2026-11-18 00:15 that hit the usage limit). Stop by 07:30 UTC (4-hour cap).
 
 Working branch: `claude/awesome-sagan-qgefe9`, kept rebased on the GitHub Pages branch `claude/intelligent-lamport-sbfavc` so it can fast-forward onto it.
