@@ -1,0 +1,938 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#14263a">
+<title>City Builder</title>
+<style>
+  :root { --bg: #14263a; --panel: #1e3650; --panel2: #284866; --text: #f1f7ff; --muted: #a2b9d0; --accent: #3ddc97; --gold: #ffd54d; --bad: #ff6b6b;
+    --grass: #4c9a52; --grass2: #57a85c; --road: #4a4f5a; --L: 64px; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; user-select: none; -webkit-user-select: none; }
+  body { display: flex; flex-direction: column; height: 100dvh; max-width: 480px; margin: 0 auto; }
+  button { font-family: inherit; }
+  /* ---- top bar ---- */
+  #top { display: flex; align-items: center; gap: 8px; padding: max(6px, env(safe-area-inset-top)) 10px 2px; min-height: 46px; }
+  #coins { position: relative; display: flex; align-items: center; gap: 4px; font-size: 22px; font-weight: 800; background: var(--panel); border-radius: 999px;
+    padding: 6px 12px; min-height: 40px; font-variant-numeric: tabular-nums; touch-action: none; }
+  #coins.bump { animation: bump .25s ease-out; }
+  @keyframes bump { 50% { transform: scale(1.08); } }
+  #coins .hold { position: absolute; inset: -3px; border-radius: 999px; border: 3px solid var(--gold); clip-path: inset(0 100% 0 0); pointer-events: none; }
+  #coins.holding .hold { transition: clip-path 2s linear; clip-path: inset(0 0 0 0); }
+  #rate { color: var(--accent); font-weight: 700; font-size: 14px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #tall { font-size: 12px; color: var(--muted); text-align: right; line-height: 1.15; white-space: nowrap; }
+  #tall b { color: var(--text); font-size: 14px; display: block; }
+  #msg { text-align: center; font-size: 14px; font-weight: 600; color: var(--muted); min-height: 22px; padding: 2px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #msg.hot { color: var(--gold); } #msg.warn { color: var(--bad); }
+  /* ---- map ---- */
+  #mapWrap { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; position: relative; }
+  #map { display: grid; gap: 3px; padding: 6px; border-radius: 16px; background: var(--grass); position: relative; touch-action: none;
+    grid-template-columns: repeat(5, var(--L)); box-shadow: inset 0 0 0 3px rgba(0,0,0,.08); }
+  #map.jam { animation: jam 1s infinite; }
+  @keyframes jam { 50% { box-shadow: inset 0 0 0 4px var(--bad), 0 0 18px rgba(255,107,107,.6); } }
+  .road { grid-column: 1 / -1; height: 14px; background: var(--road); border-radius: 4px; margin: 1px -6px; position: relative;
+    background-image: linear-gradient(90deg, #e8e2b0 50%, transparent 50%); background-size: 22px 2px; background-repeat: repeat-x; background-position: 0 6px; }
+  .road .truck { position: absolute; top: -6px; font-size: 18px; line-height: 1; transition: left .2s linear; }
+  .road .q { position: absolute; right: 8px; top: -3px; font-size: 11px; font-weight: 800; background: var(--bad); color: #fff; border-radius: 99px; padding: 1px 6px; }
+  .lot { width: var(--L); height: var(--L); border-radius: 10px; background: var(--grass2); position: relative; display: flex; align-items: flex-end; justify-content: center; }
+  .lot.empty::before { content: ''; position: absolute; inset: 30%; border-radius: 50%; background: rgba(0,0,0,.06); }
+  .lot.sale { background: repeating-linear-gradient(45deg, #6d8f5c, #6d8f5c 6px, #658655 6px, #658655 12px); }
+  .lot.sel { outline: 3px solid var(--gold); outline-offset: -1px; }
+  .lot.match { box-shadow: inset 0 0 0 3px rgba(255,255,255,.85), 0 0 10px rgba(255,255,255,.6); }
+  .lot.drop { opacity: .35; }
+  .lot svg { width: 92%; height: 92%; pointer-events: none; overflow: visible; }
+  .lot.spawn svg { animation: drop .35s ease-out; }
+  .lot.merged svg { animation: mpop .45s ease-out; }
+  @keyframes drop { from { transform: translateY(-24px) scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes mpop { 0% { transform: scale(.3); } 60% { transform: scale(1.3); } 100% { transform: scale(1); } }
+  .lot .lv { position: absolute; top: 2px; left: 4px; font-size: 10px; font-weight: 800; color: rgba(255,255,255,.75); text-shadow: 0 1px 2px rgba(0,0,0,.5); pointer-events: none; }
+  .lot .pile { position: absolute; top: -4px; right: -4px; font-size: 11px; font-weight: 800; background: var(--gold); color: #3a2a00; border-radius: 99px; padding: 1px 5px 1px 3px;
+    box-shadow: 0 2px 4px rgba(0,0,0,.35); pointer-events: none; white-space: nowrap; }
+  .lot .pile.full { animation: bob .8s infinite; }
+  .lot .pile.late { background: #9aa4ae; color: #2a2f35; }
+  @keyframes bob { 50% { transform: translateY(-3px); } }
+  .lot .ten { position: absolute; bottom: 1px; left: 2px; font-size: 10px; font-weight: 800; background: rgba(0,0,0,.55); border-radius: 6px; padding: 0 3px; pointer-events: none; }
+  .lot .let { position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); font-size: 9px; font-weight: 900; background: #fff; color: #c0392b; border: 2px solid #c0392b;
+    border-radius: 4px; padding: 0 3px; white-space: nowrap; pointer-events: none; animation: bob 1.2s infinite; }
+  .lot .badge { position: absolute; top: -6px; left: -4px; font-size: 18px; line-height: 1; pointer-events: none; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
+  .lot .badge.go { animation: bob .8s infinite; }
+  .lot .crack { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 60% 40%, rgba(60,60,60,.45), transparent 45%); border-radius: 10px; }
+  .lot .sign { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; font-size: 10px; font-weight: 900; color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,.6); text-align: center; line-height: 1.15; pointer-events: none; }
+  .lot .sign i { font-style: normal; background: #c0392b; border-radius: 4px; padding: 1px 4px; margin-bottom: 2px; text-shadow: none; }
+  .lot .sign.cheap i { background: var(--accent); color: #053; }
+  .lot .plus { font-size: 26px; color: rgba(255,255,255,.75); width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+  /* ---- main street ---- */
+  #street { display: flex; gap: 6px; padding: 6px 8px calc(8px + env(safe-area-inset-bottom)); justify-content: center; }
+  .place { flex: 1; max-width: 86px; min-height: 66px; border: 0; border-radius: 14px; background: var(--panel); color: var(--text); padding: 4px 2px; position: relative;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 11px; font-weight: 700; }
+  .place .e { font-size: 26px; line-height: 1; }
+  .place:active { transform: scale(.95); }
+  .place.tree { background: transparent; color: var(--muted); pointer-events: none; }
+  .place .b { position: absolute; top: -6px; right: -2px; min-width: 20px; height: 20px; border-radius: 99px; background: var(--bad); color: #fff; font-size: 12px;
+    font-weight: 800; display: flex; align-items: center; justify-content: center; padding: 0 5px; }
+  .place .b.gold { background: var(--gold); color: #3a2a00; }
+  .place.go { animation: glow 1.1s infinite; }
+  @keyframes glow { 50% { box-shadow: 0 0 0 4px rgba(255,213,77,.55); } }
+  .place .bar { position: absolute; left: 8px; right: 8px; bottom: 4px; height: 4px; border-radius: 4px; background: rgba(255,255,255,.15); overflow: hidden; }
+  .place .bar div { height: 100%; background: var(--accent); }
+  /* ---- bottom sheet ---- */
+  #sheet { position: fixed; left: 0; right: 0; bottom: 0; margin: 0 auto; max-width: 480px; background: var(--panel); border-radius: 20px 20px 0 0; z-index: 9;
+    padding: 14px 14px calc(14px + env(safe-area-inset-bottom)); box-shadow: 0 -10px 30px rgba(0,0,0,.45); transform: translateY(110%); transition: transform .18s ease-out; }
+  #sheet.show { transform: none; }
+  #sheet h3 { margin: 0 34px 4px 0; font-size: 19px; }
+  #sheet p { margin: 4px 0; font-size: 15px; color: var(--muted); line-height: 1.35; }
+  #sheet p b { color: var(--text); }
+  #sheet .x { position: absolute; top: 6px; right: 6px; width: 44px; height: 44px; border: 0; border-radius: 12px; background: transparent; color: var(--muted); font-size: 22px; }
+  .btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .btns button, .act { flex: 1 1 120px; min-height: 52px; border: 0; border-radius: 14px; font-size: 16px; font-weight: 800; background: var(--accent); color: #053; padding: 6px 8px; }
+  .btns button.alt { background: var(--panel2); color: var(--text); }
+  .btns button.warn { background: #ff8a65; color: #3a1200; }
+  .btns button:disabled { opacity: .45; }
+  .btns button:not(:disabled):active { transform: scale(.97); }
+  .haggle { display: flex; align-items: center; gap: 12px; margin: 6px 0; }
+  .haggle .face { font-size: 46px; line-height: 1; }
+  .haggle .price { font-size: 28px; font-weight: 800; color: var(--gold); }
+  .dots { font-size: 14px; letter-spacing: 3px; color: var(--accent); } .dots s { color: rgba(255,255,255,.2); text-decoration: none; }
+  .skills { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .skills button { min-height: 64px; border: 0; border-radius: 14px; background: var(--panel2); color: var(--text); font-size: 14px; font-weight: 800; padding: 6px; }
+  .skills button small { display: block; font-weight: 600; color: var(--muted); font-size: 12px; }
+  .skills button:disabled { opacity: .45; }
+  /* ---- overlays ---- */
+  .overlay { position: fixed; inset: 0; background: rgba(6,14,24,.88); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 12; }
+  .overlay.show { display: flex; }
+  .card { background: var(--panel); border-radius: 22px; padding: 18px 16px; width: 100%; max-width: 420px; max-height: 100%; overflow-y: auto; touch-action: pan-y; }
+  .card h2 { margin: 0 0 4px; font-size: 22px; }
+  .card .sub { color: var(--muted); font-size: 13px; margin: 0 0 8px; }
+  .tog { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
+  .tog div { flex: 1; } .tog b { font-size: 16px; } .tog small { display: block; color: var(--muted); font-size: 12px; }
+  .tog .dif { color: var(--gold); font-size: 12px; font-weight: 800; }
+  .sw { width: 64px; height: 36px; border: 0; border-radius: 99px; background: #5a6b7d; position: relative; flex: none; }
+  .sw::after { content: ''; position: absolute; top: 4px; left: 4px; width: 28px; height: 28px; border-radius: 50%; background: #fff; transition: left .15s; }
+  .sw.on { background: var(--accent); } .sw.on::after { left: 32px; }
+  .sw:disabled { opacity: .4; }
+  .tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .tools button { min-height: 48px; border: 0; border-radius: 12px; background: var(--panel2); color: var(--text); font-size: 14px; font-weight: 700; }
+  .tools button.wide { grid-column: 1 / -1; background: var(--accent); color: #053; font-size: 17px; font-weight: 800; min-height: 54px; }
+  .tools button.danger { color: var(--bad); }
+  #welcome { position: fixed; left: 10px; right: 10px; top: 54px; margin: 0 auto; max-width: 460px; z-index: 8; background: var(--gold); color: #3a2a00; border-radius: 14px;
+    padding: 10px 14px; font-weight: 800; font-size: 15px; text-align: center; display: none; box-shadow: 0 8px 20px rgba(0,0,0,.4); }
+  #welcome.show { display: block; animation: mpop .5s ease-out; }
+  #ghost { position: fixed; width: 70px; height: 70px; pointer-events: none; z-index: 11; display: none; transform: translate(-50%, -65%) scale(1.15); filter: drop-shadow(0 8px 10px rgba(0,0,0,.4)); }
+  #ghost svg { width: 100%; height: 100%; }
+  .float { position: fixed; font-weight: 800; font-size: 18px; color: var(--gold); pointer-events: none; z-index: 13; animation: floatUp .9s ease-out forwards; transform: translateX(-50%);
+    text-shadow: 0 2px 4px rgba(0,0,0,.5); white-space: nowrap; }
+  @keyframes floatUp { from { opacity: 1; margin-top: 0; } to { opacity: 0; margin-top: -46px; } }
+  #banner { position: fixed; left: 0; right: 0; margin: 0 auto; width: fit-content; max-width: 92vw; top: 34%; background: var(--gold); color: #3a2a00; font-weight: 800; font-size: 20px;
+    padding: 10px 18px; border-radius: 14px; z-index: 14; display: none; text-align: center; box-shadow: 0 8px 20px rgba(0,0,0,.4); pointer-events: none; }
+  #banner.show { display: block; animation: mpop .5s ease-out; }
+  #fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; }
+  @media (max-height: 600px) { .place { min-height: 56px; } .place .e { font-size: 22px; } #top { min-height: 40px; } }
+</style>
+</head>
+<body>
+<div id="top">
+  <div id="coins"><span>🪙</span><span id="coinN">0</span><i class="hold"></i></div>
+  <div id="rate"></div>
+  <div id="tall">tallest<b id="tallN">House</b></div>
+</div>
+<div id="msg"></div>
+<div id="mapWrap"><div id="map"></div></div>
+<div id="street"></div>
+<div id="sheet"><button class="x" data-act="close" aria-label="Close">✕</button><div id="sheetBody"></div></div>
+<div id="welcome"></div>
+<div id="ghost"></div>
+<div id="banner"></div>
+
+<div class="overlay" id="setOv">
+  <div class="card">
+    <h2>⚙️ Test settings</h2>
+    <p class="sub">Switch features on and off on this phone. The game keeps working with any mix.</p>
+    <div id="togs"></div>
+    <div class="tools">
+      <button data-tool="defaults" class="wide" style="background:var(--panel2);color:var(--text)">Back to code defaults</button>
+      <button data-tool="coins">+1,000 coins</button>
+      <button data-tool="hour">Skip 1 hour away</button>
+      <button data-tool="applicant">Send applicant</button>
+      <button data-tool="buyer">Send buyer</button>
+      <button data-tool="seller">Market seller</button>
+      <button data-tool="reset" class="danger">Reset city</button>
+      <button data-tool="close" class="wide">Done</button>
+    </div>
+  </div>
+</div>
+<canvas id="fx"></canvas>
+
+<script>
+// ================= FEATURE SWITCHES =================
+// Turn any feature off to test what makes the game fun. Every combination still plays.
+// The hidden settings screen (hold the coin counter for 2 seconds, or add #settings to the address) overrides these on one phone.
+const FEATURES = {
+  merging: true,   // drag matching buildings together; houses keep arriving.   Off: build and upgrade with coins.
+  renting: true,   // buildings earn rent into coin piles you tap to collect.   Off: income is merge bonuses, wages and the Town Hall grant.
+  tenants: true,   // apartments and up need a tenant: fill fast or check references.   Off: every building is let. (Needs renting.)
+  deals:   true,   // haggle for land, market buildings and buyers.   Off: land at the sticker price, no market, no buyers.
+  jobs:    true,   // work shifts for wages, school classes for skills.   Off: no Work or School, skills stay at 0.
+  away:    true,   // rent keeps earning while the game is closed.   Off: the clock stops while you're away.
+};
+// ================= TUNABLE CONSTANTS =================
+const BUILDINGS = [ // merge two of one level to make the next. rent: coins per minute. bonus: coins for making it. value: price in deals.
+  { name: 'House',      rent: 6,    bonus: 0,    value: 30 },
+  { name: 'Apartment',  rent: 16,   bonus: 5,    value: 75 },
+  { name: 'Tower',      rent: 42,   bonus: 15,   value: 190 },
+  { name: 'Skyscraper', rent: 110,  bonus: 40,   value: 470 },
+  { name: 'Landmark',   rent: 290,  bonus: 100,  value: 1170 },
+  { name: 'Spire',      rent: 760,  bonus: 250,  value: 2900 },
+  { name: 'Mega Tower', rent: 2000, bonus: 600,  value: 7300 },
+  { name: 'Sky City',   rent: 5200, bonus: 1500, value: 18000 },
+];
+const TOP_MERGE_PAYOUT  = 5000;  // merging two Sky Cities pays this and frees both lots
+const START_COINS       = 50;    // coins at the start (merging on)
+const START_COINS_BUILD = 150;   // coins at the start when merging is off
+const SPAWN_EVERY       = 3.0;   // seconds between new houses
+const QUEUE_MAX         = 3;     // houses that can wait on the road when the map is full (no game over)
+const CHAIN_REACTIONS   = true;  // a fresh merge also pulls in a touching building of the same level
+const CHAIN_DELAY       = 0.25;  // seconds between chain steps
+const STREAK_WINDOW     = 2.5;   // merges this close together build a streak
+const STREAK_MAX        = 5;     // streak multiplies the merge bonus up to this
+const BUILD_HOUSE_COST  = 25;    // merging off: cost to build a house on an empty lot
+const UPGRADE_SHARE     = 0.5;   // merging off: upgrade costs this share of the next level's value
+const PILE_MINUTES      = 2;     // a rent pile holds this many minutes of rent
+const LAND_PRICE        = 100;   // first FOR SALE lot
+const LAND_GROWTH       = 1.6;   // each further lot costs this much more
+const GRANT_EVERY       = 20;    // Town Hall: seconds per grant sack (always on, so no mix of features can get stuck)
+const GRANT_MAX         = 4;     // sacks it holds
+const GRANT_COINS       = 5;     // coins per sack (plus 20s of base rent when renting is off)
+const APPLICANT_EVERY   = 15;    // seconds between applicants while a home is empty
+const FIRST_APPLICANT   = 6;     // seconds before the very first applicant
+const APPLICANT_MAX     = 2;     // applicants waiting at the bus stop
+const AUTO_MOVE_IN      = 10;    // an ignored applicant moves in after this many seconds (0 = always wait for you)
+const CHECK_SECONDS     = 15;    // checking references takes this long
+const TENANT_ODDS       = { good: 0.4, ok: 0.3, bad: 0.3 };
+const GOOD_RENT         = 1.2;   // good tenants pay this much rent
+const LATE_EVERY        = 60;    // trouble tenants: in every this many seconds...
+const LATE_FOR          = 20;    // ...rent stops for this many
+const DAMAGE_EVERY      = 90;    // trouble tenants damage the place about this often (seconds)
+const DAMAGE_RENT       = 0.5;   // a damaged building earns this share of its rent
+const REPAIR_SHARE      = 0.1;   // repair costs this share of the building's value
+const HAGGLE_DOTS       = 3;     // the other side's patience
+const PUSH_SMALL        = 0.08;  // "Push" buttons move the price by these amounts
+const PUSH_BIG          = 0.20;
+const LAND_LIMIT        = [0.70, 0.90]; // seller of land will go down to this share of the asking price (random in range)
+const SELLER_ASK        = 1.30;  // market seller asks this × value...
+const SELLER_LIMIT      = [0.85, 1.05]; // ...and will go down to this × value
+const BUYER_OPEN        = 0.85;  // buyers open at this × value...
+const BUYER_LIMIT       = [1.05, 1.40]; // ...and will go up to this × value
+const MARKET_FIRST      = 60;    // seconds until the first market seller, then every MARKET_EVERY
+const MARKET_EVERY      = 90;
+const MARKET_STAYS      = 45;
+const BUYER_FIRST       = 90;    // seconds until the first buyer, then every BUYER_EVERY
+const BUYER_EVERY       = 120;
+const BUYER_STAYS       = 40;
+const SHIFT_SECONDS     = 20;    // one work shift
+const WAGE              = 25;    // wage per shift, +CAREER_BOOST per Career level
+const CAREER_BOOST      = 0.5;
+const CLASS_SECONDS     = 20;    // one school class
+const CLASS_COST        = 40;    // × (next level)²
+const SKILL_MAX         = 5;
+const LANDLORD_BOOST    = 0.10;  // rent + this per Landlord level
+const HANDY_CUT         = 0.20;  // repairs − this per Handy level
+const AWAY_MIN_SECONDS  = 30;    // shorter absences don't count
+const AWAY_RATE         = 0.5;   // share of rent earned while away
+const AWAY_CAP_HOURS    = 4;     // away earnings stop after this long
+const AWAY_BAD_CUT      = 0.3;   // trouble tenants earn this much less while away
+const SAVE_EVERY        = 3;     // seconds between saves
+const SOUND_ON          = true;
+// =====================================================
+
+(() => {
+  const STORE = 'citybuilder.city.v1', FLAGSTORE = 'citybuilder.flags.v1';
+  let frozen = false; // set by the test hook's leave(): stops saving so a reload sees the faked time away
+  const FLAG_KEYS = ['merging', 'renting', 'tenants', 'deals', 'jobs', 'away'];
+  const $ = id => document.getElementById(id);
+  const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
+  let ac = null;
+  function beep(freq, dur = 0.08, type = 'triangle', vol = 0.12) {
+    if (!SOUND_ON) return;
+    try { ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      const o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.value = freq; g.gain.value = vol;
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + dur); o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + dur);
+    } catch (e) {}
+  }
+  const chord = () => [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, .18), i * 80));
+  const fx = $('fx'), fctx = fx.getContext('2d'); let bits = [], fxOn = false;
+  function confetti(n = 120, x = innerWidth / 2, y = innerHeight * .4, coins) {
+    fx.width = innerWidth * devicePixelRatio; fx.height = innerHeight * devicePixelRatio; fctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    for (let i = 0; i < n; i++) bits.push({ x, y, vx: (Math.random() - .5) * 600, vy: -200 - Math.random() * 500, r: Math.random() * 6, life: 1.4 + Math.random(), round: coins,
+      c: coins ? `hsl(${42 + Math.random() * 10},95%,${50 + Math.random() * 20}%)` : `hsl(${Math.random() * 360},90%,60%)` });
+    if (fxOn) return; fxOn = true; let t0 = performance.now();
+    requestAnimationFrame(function step(now) { const dt = Math.min(.05, (now - t0) / 1000); t0 = now; fctx.clearRect(0, 0, innerWidth, innerHeight);
+      bits.forEach(b => { b.vy += 900 * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt; b.r += dt * 4; fctx.fillStyle = b.c;
+        if (b.round) { fctx.beginPath(); fctx.ellipse(b.x, b.y, 6, 6 * Math.abs(Math.cos(b.r)) + 1, 0, 0, Math.PI * 2); fctx.fill(); } else fctx.fillRect(b.x, b.y, 7, 7 + Math.sin(b.r) * 4); });
+      bits = bits.filter(b => b.life > 0 && b.y < innerHeight + 20);
+      if (bits.length) requestAnimationFrame(step); else { fxOn = false; fctx.clearRect(0, 0, innerWidth, innerHeight); } });
+  }
+  function fmt(n) { n = Math.floor(n); if (n < 10000) return n.toLocaleString('en'); const u = ['K', 'M', 'B', 'T']; let i = -1; while (n >= 1000 && i < u.length - 1) { n /= 1000; i++; }
+    return (n < 100 ? n.toFixed(1) : Math.floor(n)) + u[i]; }
+  const fmtTime = s => { s = Math.floor(s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? `${h}h ${m}m` : m ? `${m}m ${s % 60}s` : `${s}s`; };
+
+  // ---------- randomness (seeded so tests can repeat a run) ----------
+  let seed = (Date.now() ^ 0x9e3779b9) >>> 0;
+  const rnd = () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const between = ([a, b]) => a + rnd() * (b - a);
+
+  // ---------- feature flags: code constants, then this phone's overrides, then ?flags=101101 ----------
+  let overrides = {};
+  try { overrides = JSON.parse(localStorage.getItem(FLAGSTORE)) || {}; } catch (e) {}
+  const qs = new URLSearchParams(location.search);
+  if (/^[01]{6}$/.test(qs.get('flags') || '')) { FLAG_KEYS.forEach((k, i) => overrides[k] = qs.get('flags')[i] === '1'); saveFlags(); }
+  function saveFlags() { try { localStorage.setItem(FLAGSTORE, JSON.stringify(overrides)); } catch (e) {} }
+  let F = {};
+  function computeFlags() {
+    FLAG_KEYS.forEach(k => F[k] = k in overrides ? !!overrides[k] : !!FEATURES[k]);
+    F.tenants = F.tenants && F.renting; // tenants only matter when buildings earn rent
+  }
+  computeFlags();
+
+  // =====================================================
+  // RULES: plain data in, plain data out. The live loop, the away catch-up and the tests all use these.
+  // =====================================================
+  const COLS = 5, ROWS = 6, N = COLS * ROWS, OPEN_AT_START = 20;
+  const blankLot = (open) => ({ open, b: null });
+  function newCity(owner = 'me') {
+    const lots = []; for (let i = 0; i < N; i++) lots.push(blankLot(i < OPEN_AT_START));
+    const c = { v: 1, owner, name: 'My city', coins: F.merging ? START_COINS : START_COINS_BUILD, lifetime: 0, clock: 0, lots,
+      queue: 0, spawnT: SPAWN_EVERY, streak: { n: 0, at: -99 }, chain: null, tallest: 0, landBought: 0, merges: 0,
+      applicants: [], appT: FIRST_APPLICANT, grant: { n: 1, t: 0 },
+      job: { shift: 0, wage: 0 }, skills: { landlord: 0, handy: 0, charm: 0, career: 0 }, study: null,
+      market: { offer: null, t: MARKET_FIRST }, buyer: null, buyerT: BUYER_FIRST, deal: null, dealId: 0,
+      lastSeen: Date.now() };
+    // a starting street: merging the two houses at 6 and 7 makes an apartment beside the one at 8, which chains into a tower
+    [6, 7, 12, 16].forEach(i => c.lots[i].b = mkB(0)); c.lots[8].b = mkB(1);
+    return c;
+  }
+  function mkB(lv) { return { lv, pile: 0, tenant: null, dmg: false }; }
+  const B = (c, i) => c.lots[i] && c.lots[i].b;
+  const empties = c => c.lots.map((l, i) => l.open && !l.b ? i : -1).filter(i => i >= 0);
+  const needsTenant = b => F.tenants && b.lv >= 1;
+  const vacancies = c => c.lots.map((l, i) => l.b && needsTenant(l.b) && !l.b.tenant ? i : -1).filter(i => i >= 0);
+  const landPrice = c => Math.round(LAND_PRICE * Math.pow(LAND_GROWTH, c.landBought));
+  const skill = (c, k) => F.jobs ? c.skills[k] : 0;
+  const neighbours = i => { const r = Math.floor(i / COLS), k = i % COLS, out = [];
+    if (r > 0) out.push(i - COLS); if (r < ROWS - 1) out.push(i + COLS); if (k > 0) out.push(i - 1); if (k < COLS - 1) out.push(i + 1); return out; };
+
+  // rent per second of one building right now (0 if it can't earn)
+  function rentRate(c, b, ignoreLate) {
+    if (!F.renting || !b) return 0;
+    let m = 1;
+    if (needsTenant(b)) {
+      const t = b.tenant; if (!t) return 0;
+      if (t.q === 'good') m = GOOD_RENT;
+      if (t.q === 'bad' && !ignoreLate && isLate(c, t)) return 0;
+    }
+    if (b.dmg && F.tenants) m *= DAMAGE_RENT;
+    m *= 1 + skill(c, 'landlord') * LANDLORD_BOOST;
+    return BUILDINGS[b.lv].rent / 60 * m;
+  }
+  const isLate = (c, t) => t.q === 'bad' && ((c.clock + t.phase) % LATE_EVERY) < LATE_FOR;
+  const pileCap = (c, b) => BUILDINGS[b.lv].rent * PILE_MINUTES * (1 + skill(c, 'landlord') * LANDLORD_BOOST) * GOOD_RENT;
+  const incomePerMin = c => c.lots.reduce((a, l) => a + (l.b ? rentRate(c, l.b, true) * 60 : 0), 0);
+  const baseRentPerSec = c => c.lots.reduce((a, l) => a + (l.b ? BUILDINGS[l.b.lv].rent / 60 : 0), 0);
+  const grantValue = c => Math.round(GRANT_COINS + (F.renting ? 0 : baseRentPerSec(c) * GRANT_EVERY));
+  const wage = c => Math.round(WAGE * (1 + skill(c, 'career') * CAREER_BOOST));
+  const repairCost = (c, b) => Math.max(1, Math.round(BUILDINGS[b.lv].value * REPAIR_SHARE * Math.max(0, 1 - skill(c, 'handy') * HANDY_CUT)));
+  const upgradeCost = b => Math.round(BUILDINGS[b.lv + 1].value * UPGRADE_SHARE);
+  const classCost = (c, k) => CLASS_COST * Math.pow(c.skills[k] + 1, 2);
+
+  function newTenant() { const r = rnd(); const q = r < TENANT_ODDS.good ? 'good' : r < TENANT_ODDS.good + TENANT_ODDS.ok ? 'ok' : 'bad';
+    return { q, known: false, phase: Math.floor(rnd() * LATE_EVERY), dmgT: DAMAGE_EVERY * (0.6 + rnd() * 0.8) }; }
+  const rank = t => !t ? -1 : t.q === 'good' ? 2 : t.q === 'ok' ? 1 : 0;
+
+  // events the renderer can turn into pops and sounds; the rules only push plain records here
+  let events = [];
+  const ev = (type, data) => events.push({ type, ...data });
+  function earn(c, n, why, lot) { if (n <= 0) return; c.coins += n; c.lifetime += n; ev('coins', { n, why, lot }); }
+
+  // ---- one tick of the simulation ----
+  function step(c, dt) {
+    c.clock += dt;
+    // houses arrive
+    if (F.merging) {
+      c.spawnT -= dt;
+      if (c.spawnT <= 0) { c.spawnT += SPAWN_EVERY; if (!placeHouse(c)) c.queue = Math.min(QUEUE_MAX, c.queue + 1); }
+      if (c.queue > 0 && empties(c).length) { c.qT = (c.qT || 0) - dt; if (c.qT <= 0) { c.qT = 0.3; if (placeHouse(c)) c.queue--; } }
+      if (c.chain) { c.chain.t -= dt; if (c.chain.t <= 0) runChain(c); }
+    }
+    // rent piles up
+    c.lots.forEach((l, i) => { const b = l.b; if (!b) return;
+      if (F.renting) { const r = rentRate(c, b); if (r > 0 && b.pile < pileCap(c, b)) b.pile = Math.min(pileCap(c, b), b.pile + r * dt); }
+      if (F.tenants && b.tenant && b.tenant.q === 'bad') {
+        if (isLate(c, b.tenant) && !b.tenant.known && b.pile > 0) b.tenant.known = true;
+        b.tenant.dmgT -= dt;
+        if (b.tenant.dmgT <= 0) { b.tenant.dmgT = DAMAGE_EVERY * (0.6 + rnd() * 0.8); if (!b.dmg) { b.dmg = true; b.tenant.known = true; ev('damage', { lot: i }); } }
+      }
+    });
+    // applicants
+    if (F.tenants) {
+      const vac = vacancies(c);
+      if (vac.length && c.applicants.length < APPLICANT_MAX) { c.appT -= dt; if (c.appT <= 0) { c.appT = APPLICANT_EVERY; c.applicants.push({ ...newTenant(), wait: 0, check: null }); ev('applicant', {}); } }
+      c.applicants.forEach(a => {
+        if (a.check != null && a.check > 0) { a.check = Math.max(0, a.check - dt); if (a.check === 0) { a.known = true; ev('checked', {}); } return; }
+        if (a.check === 0 || a.hold) return;           // checked ones wait for you; so does the one you're looking at
+        a.wait += dt;
+        if (AUTO_MOVE_IN > 0 && a.wait >= AUTO_MOVE_IN && vac.length) moveIn(c, a, true);
+      });
+      c.applicants = c.applicants.filter(a => !a.gone && (vacancies(c).length || a.wait < 30));
+    }
+    // deals: market sellers and buyers
+    if (F.deals) {
+      const m = c.market;
+      if (m.offer) { m.offer.t -= dt; if (m.offer.t <= 0 && !(c.deal && c.deal.kind === 'market')) { m.offer = null; } }
+      else { m.t -= dt; if (m.t <= 0) { m.t = MARKET_EVERY; m.offer = { lv: Math.max(0, c.tallest - 1), t: MARKET_STAYS }; ev('market', {}); } }
+      if (c.buyer) { c.buyer.t -= dt; if ((c.buyer.t <= 0 && !(c.deal && c.deal.kind === 'sell')) || !B(c, c.buyer.lot)) c.buyer = null; }
+      else { c.buyerT -= dt; if (c.buyerT <= 0) { c.buyerT = BUYER_EVERY; sendBuyer(c); } }
+    }
+    // job and school
+    if (F.jobs) {
+      if (c.job.shift > 0) { c.job.shift = Math.max(0, c.job.shift - dt); if (c.job.shift === 0) { c.job.wage += wage(c); ev('wage', {}); } }
+      if (c.study) { c.study.t -= dt; if (c.study.t <= 0) { c.skills[c.study.k] = Math.min(SKILL_MAX, c.skills[c.study.k] + 1); ev('skill', { k: c.study.k }); c.study = null; } }
+    }
+    // Town Hall grant: always on
+    c.grant.t += dt; if (c.grant.t >= GRANT_EVERY) { c.grant.t -= GRANT_EVERY; c.grant.n = Math.min(GRANT_MAX, c.grant.n + 1); }
+  }
+
+  function placeHouse(c) { const e = empties(c); if (!e.length) return false; const i = e[Math.floor(rnd() * e.length)]; c.lots[i].b = mkB(0); ev('spawn', { lot: i }); return true; }
+  function sendBuyer(c) {
+    const own = c.lots.map((l, i) => l.b && l.b.lv >= 1 && l.b.lv < c.tallest ? i : -1).filter(i => i >= 0);
+    const pool = own.length ? own : c.lots.map((l, i) => l.b && l.b.lv >= 1 ? i : -1).filter(i => i >= 0);
+    if (pool.length < 1 || c.lots.filter(l => l.b).length < 2) return false;
+    c.buyer = { lot: pool[Math.floor(rnd() * pool.length)], t: BUYER_STAYS }; ev('buyer', { lot: c.buyer.lot }); return true;
+  }
+  function moveIn(c, a, auto) {
+    const vac = vacancies(c); if (!vac.length) return false;
+    const i = vac.sort((x, y) => B(c, y).lv - B(c, x).lv)[0]; // the best empty home
+    B(c, i).tenant = { q: a.q, known: a.known, phase: a.phase, dmgT: a.dmgT };
+    a.gone = true; c.applicants = c.applicants.filter(x => x !== a);
+    ev('movein', { lot: i, auto }); return true;
+  }
+
+  function doMerge(c, from, to) {
+    const a = B(c, from), b = B(c, to), lv = b.lv;
+    collectPile(c, from); collectPile(c, to);
+    if (lv === BUILDINGS.length - 1) { c.lots[from].b = null; c.lots[to].b = null; earn(c, TOP_MERGE_PAYOUT, 'merge', to); ev('merge', { lot: to, lv: lv + 1, top: true }); return; }
+    const keep = rank(a.tenant) > rank(b.tenant) ? a.tenant : b.tenant;
+    c.lots[from].b = null;
+    c.lots[to].b = { lv: lv + 1, pile: 0, tenant: keep, dmg: false };
+    if (c.buyer && (c.buyer.lot === from || c.buyer.lot === to) && !(c.deal && c.deal.kind === 'sell')) c.buyer = null;
+    c.streak.n = c.clock - c.streak.at <= STREAK_WINDOW ? Math.min(STREAK_MAX, c.streak.n + 1) : 1; c.streak.at = c.clock;
+    c.merges++;
+    earn(c, BUILDINGS[lv + 1].bonus * c.streak.n, 'merge', to);
+    const first = lv + 1 > c.tallest; if (first) c.tallest = lv + 1;
+    ev('merge', { lot: to, lv: lv + 1, streak: c.streak.n, newTallest: first });
+    if (CHAIN_REACTIONS) c.chain = { lot: to, t: CHAIN_DELAY };
+  }
+  function runChain(c) {
+    const i = c.chain.lot; c.chain = null; const b = B(c, i); if (!b) return;
+    const n = neighbours(i).find(j => B(c, j) && B(c, j).lv === b.lv && !(c.deal && c.deal.lot === j));
+    if (n != null) { ev('chain', { lot: i }); doMerge(c, n, i); }
+  }
+  function collectPile(c, i) { const b = B(c, i); if (!b || b.pile < 1) return 0; const n = Math.floor(b.pile); b.pile -= n; earn(c, n, 'rent', i); return n; }
+
+  // ---- the one dispatcher: every change to a city goes through here as plain data ----
+  // A visitor (a friend looking at your city later) gets a read-only view and can't dispatch at all.
+  function dispatch(c, a) {
+    const L = a.lot != null ? c.lots[a.lot] : null, b = L && L.b;
+    switch (a.type) {
+      case 'drop': { // drag or tap-tap one lot onto another
+        const to = c.lots[a.to]; if (!b || !to || !to.open || a.lot === a.to) return false;
+        if (c.deal && (c.deal.lot === a.lot || c.deal.lot === a.to)) return false;
+        if (!to.b) { to.b = b; L.b = null; fixBuyer(c, a.lot, a.to); ev('move', { lot: a.to }); return true; }
+        if (F.merging && to.b.lv === b.lv) { doMerge(c, a.lot, a.to); return true; }
+        const t = to.b; to.b = b; L.b = t; fixBuyer(c, a.lot, a.to, true); ev('swap', { lot: a.to }); return true;
+      }
+      case 'collect': { // tap a pile: collect it and every touching pile
+        if (!b || b.pile < 1) return false;
+        const seen = new Set([a.lot]), todo = [a.lot]; let total = 0;
+        while (todo.length) { const i = todo.shift(); total += collectPile(c, i);
+          neighbours(i).forEach(j => { if (!seen.has(j) && B(c, j) && B(c, j).pile >= 1) { seen.add(j); todo.push(j); } }); }
+        ev('collected', { lot: a.lot, n: total, count: seen.size }); return true;
+      }
+      case 'collectAll': { let total = 0; c.lots.forEach((l, i) => { total += collectPile(c, i); }); ev('collected', { n: total, all: true }); return total > 0; }
+      case 'build': { if (F.merging || !L || !L.open || b) return false; const free = !c.lots.some(l => l.b); const cost = free ? 0 : BUILD_HOUSE_COST;
+        if (c.coins < cost) return false; c.coins -= cost; L.b = mkB(0); ev('spawn', { lot: a.lot }); return true; }
+      case 'upgrade': { if (F.merging || !b || b.lv >= BUILDINGS.length - 1) return false; const cost = upgradeCost(b); if (c.coins < cost) return false;
+        c.coins -= cost; b.lv++; b.dmg = false; if (b.lv > c.tallest) c.tallest = b.lv; ev('merge', { lot: a.lot, lv: b.lv, newTallest: b.lv === c.tallest }); return true; }
+      case 'repair': { if (!b || !b.dmg) return false; const cost = repairCost(c, b); if (c.coins < cost) return false; c.coins -= cost; b.dmg = false; ev('repaired', { lot: a.lot }); return true; }
+      case 'evict': { if (!b || !b.tenant) return false; b.tenant = null; b.dmg = false; ev('evicted', { lot: a.lot }); return true; }
+      case 'tenant': { // applicant decisions: now | check | away
+        const ap = c.applicants[a.i]; if (!ap || !F.tenants) return false;
+        if (a.choice === 'now') return moveIn(c, ap, false);
+        if (a.choice === 'check' && ap.check == null) { ap.check = CHECK_SECONDS; return true; }
+        if (a.choice === 'away') { c.applicants.splice(a.i, 1); ev('sentaway', {}); return true; }
+        return false;
+      }
+      case 'buyLand': { if (!L || L.open || F.deals) return false; const p = landPrice(c); if (c.coins < p) return false;
+        c.coins -= p; L.open = true; c.landBought++; ev('land', { lot: a.lot }); return true; }
+      case 'dealOpen': return openDeal(c, a);
+      case 'dealPush': return pushDeal(c, a.amount);
+      case 'dealAccept': return acceptDeal(c);
+      case 'dealLeave': { if (!c.deal) return false; endDeal(c, false); return true; }
+      case 'work': { if (!F.jobs) return false; if (c.job.wage > 0) { const w = c.job.wage; c.job.wage = 0; earn(c, w, 'wage'); }
+        else if (c.job.shift <= 0) { c.job.shift = SHIFT_SECONDS; ev('shift', {}); } else return false; return true; }
+      case 'study': { if (!F.jobs || c.study || c.skills[a.k] >= SKILL_MAX) return false; const cost = classCost(c, a.k); if (c.coins < cost) return false;
+        c.coins -= cost; c.study = { k: a.k, t: CLASS_SECONDS }; ev('class', {}); return true; }
+      case 'grant': { if (c.grant.n < 1) return false; const n = c.grant.n * grantValue(c); c.grant.n = 0; earn(c, n, 'grant'); return true; }
+    }
+    return false;
+  }
+  function fixBuyer(c, from, to, swap) { if (!c.buyer) return; if (c.buyer.lot === from) c.buyer.lot = to; else if (swap && c.buyer.lot === to) c.buyer.lot = from; }
+
+  // ---- deals: plain data between two parties. The bot answers through counterparty.respond(), the same call a friend's answer would use later. ----
+  const counterparty = {
+    respond(deal, price, push) { // returns { ok, cost }: ok = takes the new price; cost = patience lost (a big push costs more)
+      const fine = deal.youBuy ? price >= deal.limit : price <= deal.limit;
+      return fine ? { ok: true, cost: 0 } : { ok: false, cost: push >= PUSH_BIG ? 2 : 1 };
+    },
+  };
+  function openDeal(c, a) {
+    if (!F.deals || c.deal) return false;
+    const dots = HAGGLE_DOTS + (skill(c, 'charm') >= 2 ? 1 : 0) + (skill(c, 'charm') >= 4 ? 1 : 0);
+    let d;
+    if (a.kind === 'land') { const L = c.lots[a.lot]; if (!L || L.open) return false; const ask = landPrice(c);
+      d = { kind: 'land', lot: a.lot, youBuy: true, ask, limit: Math.round(ask * between(LAND_LIMIT)), who: '🧑‍🌾', what: 'this plot of land' }; }
+    else if (a.kind === 'market') { const o = c.market.offer; if (!o) return false; const v = BUILDINGS[o.lv].value;
+      d = { kind: 'market', lv: o.lv, youBuy: true, ask: Math.round(v * SELLER_ASK), limit: Math.round(v * between(SELLER_LIMIT)), who: '🧔', what: `a ${BUILDINGS[o.lv].name}` }; }
+    else if (a.kind === 'sell') { if (!c.buyer || !B(c, c.buyer.lot) || c.lots.filter(l => l.b).length < 2) return false; const b = B(c, c.buyer.lot), v = BUILDINGS[b.lv].value;
+      d = { kind: 'sell', lot: c.buyer.lot, youBuy: false, ask: Math.round(v * BUYER_OPEN), limit: Math.round(v * between(BUYER_LIMIT)), who: '👩‍💼', what: `your ${BUILDINGS[b.lv].name}` }; }
+    else return false;
+    d.id = ++c.dealId; d.from = d.youBuy ? 'bot' : c.owner; d.to = d.youBuy ? c.owner : 'bot';
+    d.price = d.ask; d.dots = dots; d.maxDots = dots; d.say = d.youBuy ? 'Make me an offer.' : `I'll give you ${fmt(d.ask)}.`;
+    c.deal = d; return true;
+  }
+  function pushDeal(c, amount) {
+    const d = c.deal; if (!d) return false;
+    const price = Math.round(d.price * (d.youBuy ? 1 - amount : 1 + amount));
+    const r = counterparty.respond(d, price, amount);
+    if (r.ok) { d.price = price; const near = Math.abs(price - d.limit) <= Math.abs(d.limit) * 0.05; d.say = near ? "That's my limit." : 'OK, fine.'; ev('dealok', {}); }
+    else { d.dots -= r.cost; d.say = d.dots > 0 ? (r.cost > 1 ? 'Ha! No way.' : 'Hmm, no.') : 'Forget it!'; ev('dealno', {});
+      if (d.dots <= 0) { endDeal(c, false, true); } }
+    return true;
+  }
+  function acceptDeal(c) {
+    const d = c.deal; if (!d) return false;
+    if (d.youBuy && c.coins < d.price) { d.say = "You can't afford that yet."; return false; }
+    if (d.kind === 'land') { c.coins -= d.price; c.lots[d.lot].open = true; c.landBought++; ev('land', { lot: d.lot, price: d.price, saved: d.ask - d.price }); }
+    else if (d.kind === 'market') { const e = empties(c); if (!e.length) { d.say = 'You need an empty lot for it.'; return false; }
+      c.coins -= d.price; const i = e[0]; c.lots[i].b = mkB(d.lv); if (d.lv > c.tallest) c.tallest = d.lv; c.market.offer = null; ev('bought', { lot: i, saved: d.ask - d.price }); }
+    else if (d.kind === 'sell') { const b = B(c, d.lot); if (!b || c.lots.filter(l => l.b).length < 2) { endDeal(c, false); return false; }
+      collectPile(c, d.lot); c.lots[d.lot].b = null; earn(c, d.price, 'sale', d.lot); c.buyer = null; ev('sold', { lot: d.lot, gain: d.price - d.ask }); }
+    endDeal(c, true); return true;
+  }
+  function endDeal(c, done, walked) {
+    const d = c.deal; c.deal = null; if (!d) return;
+    if (!done && walked) { if (d.kind === 'market') c.market.offer = null; if (d.kind === 'sell') c.buyer = null; ev('walked', {}); }
+  }
+
+  // ---------- storage adapter (localStorage today; a server could stand in later) ----------
+  const store = {
+    load() { try { const s = JSON.parse(localStorage.getItem(STORE)); if (s && s.v === 1 && Array.isArray(s.lots) && s.lots.length === N) return s; } catch (e) {} return null; },
+    save(c) { if (frozen) return; c.lastSeen = Date.now(); try { localStorage.setItem(STORE, JSON.stringify(c)); } catch (e) {} },
+    clear() { try { localStorage.removeItem(STORE); } catch (e) {} },
+  };
+
+  // =====================================================
+  // UI: renders any city; input turns taps into dispatch() actions
+  // =====================================================
+  let city = store.load() || newCity(), readOnly = false;
+  if (city.deal) city.deal = null; // deals don't survive a reload
+  city.applicants.forEach(a => a.hold = false);
+  let sel = null, drag = null, sheet = null, msgOverride = null, welcome = null;
+
+  const BUILDING_ART = [
+    `<rect x="26" y="62" width="48" height="36" fill="#ffb86b"/><path d="M20 64 L50 38 L80 64 Z" fill="#e0533d"/><rect x="44" y="76" width="12" height="22" fill="#7a4b2a"/><rect x="30" y="70" width="10" height="9" fill="#cfefff"/><rect x="60" y="70" width="10" height="9" fill="#cfefff"/>`,
+    `<rect x="24" y="38" width="52" height="60" rx="2" fill="#7fc6a4"/><rect x="22" y="34" width="56" height="6" fill="#4f9c79"/>${win(30, 46, 3, 4, 9, 8, 15, 12, '#e8fff4')}<rect x="44" y="86" width="12" height="12" fill="#2f6b50"/>`,
+    `<rect x="30" y="20" width="40" height="78" rx="2" fill="#6aa8ff"/><rect x="34" y="14" width="32" height="8" fill="#4a83d6"/>${win(35, 26, 3, 7, 7, 7, 11, 10, '#e6f1ff')}`,
+    `<rect x="49" y="2" width="2" height="10" fill="#cfd8e6"/><path d="M38 14 L62 14 L66 98 L34 98 Z" fill="#8e9bff"/><rect x="40" y="12" width="20" height="4" fill="#6c78e0"/>${win(41, 20, 3, 10, 5, 5, 7, 7.6, '#f0f2ff')}`,
+    `<path d="M50 0 L53 14 L47 14 Z" fill="#fff6c2"/><path d="M42 16 L58 16 L64 98 L36 98 Z" fill="#ffd54d"/><path d="M44 16 L56 16 L58 40 L42 40 Z" fill="#ffe792"/>${win(43, 44, 3, 7, 4, 4, 6, 7.4, '#8a6400')}<circle cx="50" cy="8" r="3" fill="#fff"/>`,
+    `<path d="M50 -14 L54 6 L46 6 Z" fill="#e7f6ff"/><path d="M40 6 L60 6 L68 98 L32 98 Z" fill="#45c4d9"/><path d="M28 70 L72 70 L72 98 L28 98 Z" fill="#2e93a8"/>${win(42, 14, 3, 8, 4, 5, 6.5, 7, '#eafcff')}${win(32, 76, 5, 2, 6, 6, 8, 10, '#d6f7ff')}`,
+    `<rect x="20" y="30" width="20" height="68" fill="#b07cff"/><rect x="60" y="30" width="20" height="68" fill="#b07cff"/><rect x="38" y="-6" width="24" height="104" fill="#d1a8ff"/><path d="M38 -6 L50 -22 L62 -6 Z" fill="#fff"/><rect x="20" y="44" width="60" height="6" fill="#8a52e6"/>${win(41, 4, 3, 11, 4, 4, 6.5, 8, '#fff')}${win(23, 54, 2, 5, 5, 5, 8, 8.5, '#efe2ff')}${win(63, 54, 2, 5, 5, 5, 8, 8.5, '#efe2ff')}`,
+    `<ellipse cx="50" cy="96" rx="48" ry="6" fill="#ffd54d" opacity=".5"/><rect x="10" y="40" width="18" height="58" fill="#ff9f43"/><rect x="72" y="36" width="18" height="62" fill="#ff9f43"/><path d="M34 -16 L66 -16 L70 98 L30 98 Z" fill="#ffd54d"/><circle cx="50" cy="-22" r="8" fill="#fff6c2"/><path d="M50 -40 L50 -30" stroke="#fff" stroke-width="2"/>${win(37, -8, 4, 12, 4, 4, 7, 8.6, '#7a4b00')}${win(13, 46, 2, 5, 4, 4, 7, 10, '#fff1d6')}${win(75, 42, 2, 6, 4, 4, 7, 9, '#fff1d6')}`,
+  ];
+  function win(x, y, cols, rows, w, h, gx, gy, c) { let s = ''; for (let r = 0; r < rows; r++) for (let k = 0; k < cols; k++) s += `<rect x="${x + k * gx}" y="${y + r * gy}" width="${w}" height="${h}" rx="1" fill="${c}"/>`; return s; }
+  const art = lv => `<svg viewBox="0 0 100 100" aria-label="${BUILDINGS[lv].name}">${BUILDING_ART[lv]}</svg>`;
+
+  // ---- map: three blocks of two rows, a road between blocks ----
+  const lotEls = [];
+  function buildMap() {
+    const m = $('map'); m.innerHTML = '';
+    for (let r = 0; r < ROWS; r++) {
+      if (r === 2 || r === 4) { const road = document.createElement('div'); road.className = 'road'; road.innerHTML = r === 2 ? '<span class="truck" id="truck">🚚</span><span class="q" id="queue" hidden></span>' : ''; m.appendChild(road); }
+      for (let k = 0; k < COLS; k++) { const i = r * COLS + k, el = document.createElement('div'); el.className = 'lot'; el.dataset.i = i; m.appendChild(el); lotEls[i] = el; }
+    }
+  }
+  function layout() {
+    const top = $('top').offsetHeight + $('msg').offsetHeight, street = $('street').offsetHeight;
+    const w = Math.min(innerWidth, 480), h = innerHeight - top - street - 10;
+    const L = Math.floor(Math.min((w - 12 - 4 * 3 - 12) / 5, (h - 12 - 7 * 3 - 2 * 16) / 6));
+    document.documentElement.style.setProperty('--L', Math.max(40, L) + 'px');
+  }
+
+  const lotKeys = [];
+  function renderLots(c) {
+    const dragFrom = drag && drag.moving ? drag.from : null, dragLv = dragFrom != null ? B(c, dragFrom).lv : sel != null && B(c, sel) ? B(c, sel).lv : null;
+    c.lots.forEach((l, i) => {
+      const b = l.b; let html = '', cls = 'lot';
+      if (!l.open) {
+        cls += ' sale'; const p = landPrice(c), cheap = c.coins >= p * (F.deals ? LAND_LIMIT[0] : 1);
+        const next = c.lots.findIndex(x => !x.open);
+        html = i === next ? `<div class="sign${cheap ? ' cheap' : ''}"><i>FOR SALE</i>🪙${fmt(p)}</div>` : `<div class="sign" style="opacity:.55">🌳</div>`;
+      } else if (!b) {
+        cls += ' empty'; if (!F.merging && !readOnly) html = '<div class="plus">+</div>';
+      } else {
+        html = art(b.lv) + `<span class="lv">${b.lv + 1}</span>`;
+        if (F.renting && b.pile >= 1) { const late = needsTenant(b) && b.tenant && isLate(c, b.tenant);
+          html += `<span class="pile${b.pile >= pileCap(c, b) * 0.98 || welcome ? ' full' : ''}${late ? ' late' : ''}">${b.pile >= pileCap(c, b) / 2 || welcome ? '💰' : '🪙'}${fmt(b.pile)}</span>`; }
+        else if (F.renting && needsTenant(b) && b.tenant && isLate(c, b.tenant) && b.tenant.known) html += `<span class="pile late">⏰ late</span>`;
+        if (needsTenant(b)) {
+          if (!b.tenant) html += `<span class="let">TO LET</span>`;
+          else html += `<span class="ten">${b.tenant.known ? '★'.repeat(rank(b.tenant) + 1) : '?'}</span>`;
+        }
+        if (F.tenants && b.dmg) html += `<span class="crack"></span><span class="badge go">🔧</span>`;
+        else if (F.deals && c.buyer && c.buyer.lot === i) html += `<span class="badge go">🤝</span>`;
+        if (i === dragFrom) cls += ' drop';
+        if (dragLv != null && i !== dragFrom && i !== sel && b.lv === dragLv && F.merging) cls += ' match';
+      }
+      if (i === sel) cls += ' sel';
+      if (anims[i]) { if (anims[i].until > performance.now()) cls += ' ' + anims[i].cls; else delete anims[i]; }
+      const key = cls + html;
+      if (lotKeys[i] !== key) { lotKeys[i] = key; lotEls[i].className = cls; lotEls[i].innerHTML = html; }
+    });
+    $('map').classList.toggle('jam', F.merging && c.queue > 0 && !empties(c).length);
+    const q = $('queue'), tr = $('truck');
+    if (tr) { tr.hidden = !F.merging; tr.style.left = `calc(${(1 - c.spawnT / SPAWN_EVERY) * 100}% - 18px)`; }
+    if (q) { q.hidden = !(F.merging && c.queue > 0); q.textContent = `+${c.queue} waiting`; }
+  }
+  const anims = {};
+  function animLot(i, cls) { anims[i] = { cls, until: performance.now() + 460 }; lotKeys[i] = null; }
+
+  // ---- main street: one place per feature, drawn as a tree when its feature is off ----
+  const PLACES = [
+    { id: 'bus', e: '🚏', name: 'Bus stop', on: () => F.tenants },
+    { id: 'work', e: '💼', name: 'Work', on: () => F.jobs },
+    { id: 'school', e: '🎓', name: 'School', on: () => F.jobs },
+    { id: 'market', e: '🏪', name: 'Market', on: () => F.deals },
+    { id: 'hall', e: '🏛️', name: 'Town Hall', on: () => true },
+  ];
+  const placeEls = {}, placeKeys = {};
+  PLACES.forEach(p => { const el = document.createElement('button'); el.className = 'place'; el.dataset.place = p.id; $('street').appendChild(el); placeEls[p.id] = el; });
+  function renderStreet(c) {
+    PLACES.forEach(p => {
+      const on = p.on(); let badge = '', go = false, bar = null, label = p.name;
+      if (on) {
+        if (p.id === 'bus') { const n = c.applicants.length; if (n) { badge = `<span class="b">${n}</span>`; go = true; } if (c.applicants.some(a => a.check > 0)) bar = 1 - c.applicants.find(a => a.check > 0).check / CHECK_SECONDS; }
+        if (p.id === 'work') { if (c.job.wage > 0) { badge = '<span class="b gold">💰</span>'; go = true; } else if (c.job.shift > 0) { bar = 1 - c.job.shift / SHIFT_SECONDS; label = 'Working'; } }
+        if (p.id === 'school' && c.study) { bar = 1 - c.study.t / CLASS_SECONDS; label = 'In class'; }
+        if (p.id === 'market' && c.market.offer) { badge = '<span class="b gold">!</span>'; go = true; }
+        if (p.id === 'hall' && c.grant.n > 0) { badge = `<span class="b gold">${c.grant.n}</span>`; go = c.grant.n >= GRANT_MAX || (!F.merging && !F.renting); }
+      }
+      const html = on ? `<span class="e">${p.e}</span>${label}${badge}${bar != null ? `<span class="bar"><div style="width:${Math.round(bar * 100)}%"></div></span>` : ''}` : '<span class="e">🌳</span>';
+      const key = (on ? 'place' : 'place tree') + (go ? ' go' : '') + html;
+      if (placeKeys[p.id] !== key) { placeKeys[p.id] = key; placeEls[p.id].className = (on ? 'place' : 'place tree') + (go ? ' go' : ''); placeEls[p.id].innerHTML = html; placeEls[p.id].disabled = !on; }
+    });
+  }
+
+  function renderTop(c) {
+    $('coinN').textContent = fmt(c.coins);
+    const inc = incomePerMin(c);
+    $('rate').textContent = F.renting ? `+${fmt(inc)} / min` : F.merging ? `${c.merges} merges` : '';
+    $('tallN').textContent = BUILDINGS[c.tallest].name;
+  }
+  function hint(c) {
+    if (msgOverride && msgOverride.until > performance.now()) return msgOverride;
+    if (welcome) return { t: welcome, cls: 'hot' };
+    if (F.merging && c.queue > 0 && !empties(c).length) return { t: '⚠️ Map full! Merge to make room', cls: 'warn' };
+    if (F.merging && c.merges === 0) return { t: 'Drag a house onto a house!', cls: 'hot' };
+    if (!F.merging && c.lots.every(l => !l.b)) return { t: 'Tap an empty lot to build a house', cls: 'hot' };
+    if (F.tenants && c.applicants.length && vacancies(c).length) return { t: 'Someone wants to rent! Tap the 🚏 bus stop', cls: 'hot' };
+    if (F.tenants && c.lots.some(l => l.b && l.b.dmg)) return { t: 'Something is broken 🔧 Tap it to repair', cls: '' };
+    if (F.renting && c.lots.some(l => l.b && l.b.pile >= pileCap(c, l.b) * 0.98)) return { t: 'Full coin piles! Tap them to collect 💰', cls: 'hot' };
+    if (F.deals && c.buyer) return { t: 'A buyer 🤝 wants one of your buildings', cls: '' };
+    if (F.deals && c.market.offer) return { t: 'The 🏪 market has a building for sale', cls: '' };
+    if (F.jobs && c.job.wage > 0) return { t: 'Your wages are ready at 💼 Work', cls: '' };
+    const sale = c.lots.findIndex(l => !l.open); if (sale >= 0 && c.coins >= landPrice(c) * 0.75) return { t: 'Grow your city: tap the FOR SALE land', cls: '' };
+    if (!F.merging) return { t: 'Tap a building to upgrade it', cls: '' };
+    if (F.renting && c.merges < 6) return { t: 'Bigger buildings earn more rent', cls: '' };
+    return { t: '', cls: '' };
+  }
+  function say(t, cls = 'hot', ms = 2200) { msgOverride = { t, cls, until: performance.now() + ms }; }
+  function renderMsg(c) { const h = hint(c), m = $('msg'); if (m.textContent !== h.t) m.textContent = h.t; m.className = h.cls || ''; }
+
+  // ---- bottom sheets: each one belongs to the thing that was tapped ----
+  function openSheet(kind, arg) { sheet = { kind, arg }; if (kind === 'bus') city.applicants.forEach((a, i) => a.hold = i === 0); renderSheet(city, true); $('sheet').classList.add('show'); }
+  function closeSheet() {
+    if (city.deal) dispatch(city, { type: 'dealLeave' });
+    city.applicants.forEach(a => a.hold = false);
+    sheet = null; sel = null; $('sheet').classList.remove('show');
+  }
+  let sheetKey = '';
+  function renderSheet(c, force) {
+    if (!sheet) return;
+    const h = sheetHTML(c); if (h == null) { closeSheet(); return; }
+    const key = h.replace(/<i class="t">[^<]*<\/i>/g, '');
+    if (force || key !== sheetKey) { sheetKey = key; $('sheetBody').innerHTML = h; }
+    else { const live = h.match(/<i class="t">[^<]*<\/i>/g) || [], els = $('sheetBody').querySelectorAll('i.t'); els.forEach((el, k) => { if (live[k]) el.textContent = live[k].replace(/<[^>]+>/g, ''); }); }
+  }
+  const T = s => `<i class="t">${s}</i>`;
+  const btn = (act, label, opts = {}) => `<button data-act="${act}"${opts.arg != null ? ` data-arg="${opts.arg}"` : ''}${opts.cls ? ` class="${opts.cls}"` : ''}${opts.off ? ' disabled' : ''}>${label}</button>`;
+  function sheetHTML(c) {
+    const s = sheet;
+    if (c.deal) {
+      const d = c.deal, face = d.dots >= d.maxDots ? '😀' : d.dots >= 2 ? '🙂' : d.dots === 1 ? '😠' : '😤';
+      const dots = '●'.repeat(Math.max(0, d.dots)) + `<s>${'●'.repeat(Math.max(0, d.maxDots - d.dots))}</s>`;
+      const verb = d.youBuy ? 'Buy' : 'Sell';
+      return `<h3>${d.youBuy ? 'Buying' : 'Selling'} ${d.what}</h3>
+        <div class="haggle"><div class="face">${d.who}${face}</div><div><div class="price">🪙 ${fmt(d.price)}</div><div class="dots">${dots}</div></div></div>
+        <p>"${d.say}" <small>${d.youBuy ? `Asked ${fmt(d.ask)}` : `Opened at ${fmt(d.ask)}`}</small></p>
+        <div class="btns">${btn('dealAccept', `✅ ${verb} for ${fmt(d.price)}`, { off: d.youBuy && c.coins < d.price })}</div>
+        <div class="btns">${btn('dealPush', d.youBuy ? 'Push 8% lower' : 'Push 8% higher', { arg: PUSH_SMALL, cls: 'alt' })}${btn('dealPush', d.youBuy ? 'Push 20% lower' : 'Push 20% higher', { arg: PUSH_BIG, cls: 'warn' })}</div>`;
+    }
+    if (s.kind === 'lot') {
+      const L = c.lots[s.arg], b = L.b;
+      if (!L.open) {
+        const p = landPrice(c);
+        if (F.deals) return `<h3>🌳 Land for sale</h3><p>The farmer asks <b>🪙 ${fmt(p)}</b>. Haggle and you might pay less, but push too hard and they walk away.</p>
+          <div class="btns">${btn('haggleLand', '🤝 Haggle', { arg: s.arg })}</div>`;
+        return `<h3>🌳 Land for sale</h3><p>Price <b>🪙 ${fmt(p)}</b>. More land, more room to build.</p><div class="btns">${btn('buyLand', `Buy for ${fmt(p)}`, { arg: s.arg, off: c.coins < p })}</div>`;
+      }
+      if (!b) { if (F.merging) return null; const free = !c.lots.some(l => l.b);
+        return `<h3>Empty lot</h3><p>Build a house here${free ? ' (your first one is free)' : ''}.</p><div class="btns">${btn('build', `🏠 Build house · 🪙 ${free ? 0 : BUILD_HOUSE_COST}`, { arg: s.arg, off: !free && c.coins < BUILD_HOUSE_COST })}</div>`; }
+      const name = BUILDINGS[b.lv].name, rate = rentRate(c, b, true) * 60;
+      let body = `<h3>${name}</h3>`;
+      if (F.renting) body += `<p>Rent: <b>🪙 ${fmt(rate)} / min</b>${needsTenant(b) && !b.tenant ? ' when someone lives here' : ''}${b.dmg && F.tenants ? ' (halved: it\'s damaged)' : ''}</p>`;
+      if (needsTenant(b)) {
+        if (!b.tenant) body += `<p>Empty: <b>TO LET</b>. Find a tenant at the 🚏 bus stop.</p>`;
+        else { const t = b.tenant; const what = !t.known ? 'Unknown tenant (?). You\'ll find out soon.' : t.q === 'good' ? '★★★ Great tenant: pays extra, always on time.' : t.q === 'ok' ? '★★ OK tenant.' : '★ Trouble tenant: pays late and breaks things.';
+          body += `<p>${what}</p>`; }
+      }
+      const bs = [];
+      if (F.tenants && b.dmg) bs.push(btn('repair', `🔧 Repair · 🪙 ${fmt(repairCost(c, b))}`, { arg: s.arg, off: c.coins < repairCost(c, b) }));
+      if (needsTenant(b) && b.tenant) bs.push(btn('evict', 'Evict tenant', { arg: s.arg, cls: 'alt' }));
+      if (!F.merging && b.lv < BUILDINGS.length - 1) bs.push(btn('upgrade', `⬆️ ${BUILDINGS[b.lv + 1].name} · 🪙 ${fmt(upgradeCost(b))}`, { arg: s.arg, off: c.coins < upgradeCost(b) }));
+      if (F.deals && c.buyer && c.buyer.lot === s.arg) { body += `<p>🤝 A buyer wants it! ${T(Math.ceil(c.buyer.t) + 's')} left.</p>`; bs.push(btn('haggleSell', '🤝 Talk to the buyer', { arg: s.arg })); }
+      if (F.merging) body += `<p>${b.lv < BUILDINGS.length - 1 ? `Tap another ${name} to merge them into a ${BUILDINGS[b.lv + 1].name}.` : 'Merge two Sky Cities for a giant payout!'}</p>`;
+      return body + (bs.length ? `<div class="btns">${bs.join('')}</div>` : '');
+    }
+    if (s.kind === 'bus') {
+      const vac = vacancies(c).length;
+      if (!c.applicants.length) return `<h3>🚏 Bus stop</h3><p>${vac ? `Nobody yet. Someone comes along every ${APPLICANT_EVERY}s while a home is empty.` : 'All your homes are rented. Merge up to an Apartment or bigger to need a new tenant.'}</p>`;
+      const a = c.applicants[0];
+      let h = `<h3>🚏 Someone wants to rent${c.applicants.length > 1 ? ` (+${c.applicants.length - 1} more)` : ''}</h3>`;
+      if (a.check > 0) return h + `<p>Checking references… ${T(Math.ceil(a.check) + 's')}</p><p>Your home stays empty while you wait.</p><div class="btns">${btn('tenant', 'Close', { arg: '0:close', cls: 'alt' })}</div>`;
+      if (a.check === 0) { const st = '★'.repeat(rank(a) + 1) + '☆'.repeat(2 - rank(a));
+        const what = a.q === 'good' ? 'Great: pays extra and always on time.' : a.q === 'ok' ? 'OK: pays normal rent.' : 'Trouble: pays late and breaks things.';
+        return h + `<p style="font-size:26px;color:var(--gold);margin:2px 0">${st}</p><p>${what}</p><div class="btns">${btn('tenant', 'Move in', { arg: '0:now', off: !vac })}${btn('tenant', 'Send away', { arg: '0:away', cls: 'alt' })}</div>`; }
+      return h + `<p><b>Fill fast:</b> rent starts now, but they might be trouble. <b>Check references:</b> wait ${CHECK_SECONDS}s and see who they are.</p>
+        ${vac ? '' : '<p>No empty home right now. Merge up to make one.</p>'}
+        <div class="btns">${btn('tenant', '⚡ Move in now', { arg: '0:now', off: !vac })}${btn('tenant', `🔍 Check (${CHECK_SECONDS}s)`, { arg: '0:check', cls: 'alt' })}</div>`;
+    }
+    if (s.kind === 'school') {
+      const SK = [['landlord', '🏠 Landlord', `+${LANDLORD_BOOST * 100}% rent`, F.renting], ['handy', '🔧 Handy', `−${HANDY_CUT * 100}% repairs`, F.tenants],
+        ['charm', '😊 Charm', 'more patience in deals', F.deals], ['career', '💼 Career', `+${CAREER_BOOST * 100}% wages`, true]].filter(x => x[3]);
+      return `<h3>🎓 School</h3><p>${c.study ? `In class: ${SK.find(x => x[0] === c.study.k)?.[1] || c.study.k}… ${T(Math.ceil(c.study.t) + 's')}` : `Take a ${CLASS_SECONDS}s class to level up a skill.`}</p>
+        <div class="skills">${SK.map(([k, n, d]) => { const lv = c.skills[k], max = lv >= SKILL_MAX, cost = classCost(c, k);
+          return `<button data-act="study" data-arg="${k}"${c.study || max || c.coins < cost ? ' disabled' : ''}>${n} · Lv ${lv}<small>${d} per level · ${max ? 'max' : '🪙 ' + fmt(cost)}</small></button>`; }).join('')}</div>`;
+    }
+    return null;
+  }
+
+  // ---------- turn rule events into pops, sounds and messages ----------
+  function centre(i) { const r = lotEls[i].getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+  function floatAt(t, x, y, color) { const el = document.createElement('div'); el.className = 'float'; el.textContent = t; el.style.left = x + 'px'; el.style.top = y + 'px'; if (color) el.style.color = color;
+    document.body.appendChild(el); setTimeout(() => el.remove(), 900); }
+  let bannerTimer;
+  function banner(t) { const b = $('banner'); b.textContent = t; b.classList.remove('show'); void b.offsetWidth; b.classList.add('show'); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('show'), 1500); }
+  function bumpCoins() { const m = $('coins'); m.classList.remove('bump'); void m.offsetWidth; m.classList.add('bump'); }
+  function playEvents() {
+    const list = events; events = [];
+    list.forEach(e => {
+      const p = e.lot != null ? centre(e.lot) : null;
+      switch (e.type) {
+        case 'spawn': animLot(e.lot, 'spawn'); beep(300, .04, 'sine', .05); break;
+        case 'merge': animLot(e.lot, 'merged'); beep(440 + e.lv * 110, .14); buzz(15);
+          if (p) confetti(6 + e.lv * 8, p.x, p.y);
+          if (e.top) { banner(`🌆 Sky City payout! +${fmt(TOP_MERGE_PAYOUT)}`); confetti(200); chord(); }
+          else if (e.newTallest && e.lv >= 2) { banner(`🏗️ New: ${BUILDINGS[e.lv].name}!`); confetti(100); chord(); }
+          if (e.streak > 1 && p) floatAt(`Streak ×${e.streak}!`, p.x, p.y - 30, '#7cf3c0');
+          break;
+        case 'chain': if (e.lot != null) { const q = centre(e.lot); floatAt('CHAIN!', q.x, q.y - 40, '#ff9ff3'); } beep(880, .1); break;
+        case 'coins': if (p && e.why !== 'rent') floatAt(`+${fmt(e.n)}`, p.x, p.y - 10); if (e.why === 'grant' || e.why === 'wage') { floatAt(`+${fmt(e.n)}`, innerWidth / 2, innerHeight - 120); confetti(30, innerWidth / 2, innerHeight - 100, true); }
+          if (e.why === 'sale') banner(`🤝 Sold for ${fmt(e.n)}!`); bumpCoins(); break;
+        case 'collected': if (e.n > 0) { const q = e.lot != null ? centre(e.lot) : { x: innerWidth / 2, y: innerHeight / 2 }; floatAt(`+${fmt(e.n)}`, q.x, q.y - 16);
+          for (let k = 0; k < Math.min(5, e.count || 5); k++) setTimeout(() => beep(900 + k * 90, .05, 'sine', .07), k * 60);
+          confetti(Math.min(80, 10 + e.n / 3), q.x, q.y, true); buzz(10); if (e.all) { banner(`💰 Collected ${fmt(e.n)}!`); chord(); } } break;
+        case 'move': case 'swap': beep(380, .04, 'sine', .05); break;
+        case 'damage': if (p) floatAt('💥 Damage!', p.x, p.y - 20, '#ff8a65'); beep(150, .2, 'square', .06); say('A trouble tenant broke something 🔧', 'warn'); break;
+        case 'repaired': if (p) floatAt('Fixed!', p.x, p.y - 20, '#7cf3c0'); beep(700, .1); break;
+        case 'evicted': if (p) floatAt('Empty again', p.x, p.y - 20, '#ffb3b3'); beep(220, .12, 'square', .05); break;
+        case 'movein': if (p) floatAt(e.auto ? 'Moved in!' : 'Welcome!', p.x, p.y - 20, '#7cf3c0'); beep(660, .1); if (e.auto) say('An applicant moved in by themselves', ''); break;
+        case 'applicant': beep(520, .06); beep(620, .06); break;
+        case 'checked': say('References are back! Tap the 🚏 bus stop'); beep(760, .1); break;
+        case 'sentaway': beep(260, .08); break;
+        case 'land': if (p) { animLot(e.lot, 'spawn'); confetti(60, p.x, p.y); } banner(e.saved > 0 ? `🌳 Land bought! You saved ${fmt(e.saved)}` : '🌳 New land!'); chord(); break;
+        case 'bought': animLot(e.lot, 'spawn'); banner(e.saved > 0 ? `Bought! You saved ${fmt(e.saved)}` : 'Bought!'); chord(); break;
+        case 'sold': if (e.gain > 0) say(`Nice haggling: +${fmt(e.gain)} on their first offer`); break;
+        case 'dealok': beep(700, .08); break;
+        case 'dealno': beep(180, .12, 'square', .05); buzz(20); break;
+        case 'walked': say('They walked away. Too pushy!', 'warn'); beep(140, .3, 'square', .07); break;
+        case 'buyer': beep(600, .06); break;
+        case 'market': beep(640, .06); break;
+        case 'wage': beep(800, .08); break;
+        case 'shift': say('Off to work! Keep building while you earn'); break;
+        case 'skill': banner(`🎓 Skill up!`); chord(); break;
+        case 'class': say('Class started'); break;
+      }
+    });
+  }
+
+  // ---------- input ----------
+  const lotAt = (x, y) => { const el = document.elementFromPoint(x, y); const l = el && el.closest && el.closest('.lot'); return l ? +l.dataset.i : -1; };
+  function act(a) { if (readOnly) return false; const ok = dispatch(city, a); playEvents(); renderAll(); return ok; }
+  $('map').addEventListener('pointerdown', e => {
+    if (readOnly) return; e.preventDefault();
+    const i = lotAt(e.clientX, e.clientY); if (i < 0) return;
+    const b = B(city, i);
+    if (b && !city.deal) { drag = { from: i, x0: e.clientX, y0: e.clientY, moving: false }; try { $('map').setPointerCapture(e.pointerId); } catch (err) {} }
+    else drag = { from: i, x0: e.clientX, y0: e.clientY, moving: false, empty: true };
+  });
+  addEventListener('pointermove', e => {
+    if (!drag || drag.empty) return;
+    if (!drag.moving && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > 8) {
+      drag.moving = true; $('ghost').innerHTML = art(B(city, drag.from).lv); $('ghost').style.display = 'block'; if (sheet) closeSheet(); sel = null; renderLots(city);
+    }
+    if (drag.moving) { $('ghost').style.left = e.clientX + 'px'; $('ghost').style.top = e.clientY + 'px'; }
+  });
+  addEventListener('pointerup', e => {
+    if (!drag) return; const d = drag; drag = null; $('ghost').style.display = 'none';
+    if (d.moving) { const to = lotAt(e.clientX, e.clientY); if (to >= 0 && to !== d.from) act({ type: 'drop', lot: d.from, to }); else renderLots(city); return; }
+    tapLot(d.from);
+  });
+  function tapLot(i) {
+    const L = city.lots[i], b = L.b;
+    if (city.deal) return;
+    if (sel != null && sel !== i && L.open && B(city, sel) && (!b || (F.merging && b.lv === B(city, sel).lv))) { const from = sel; closeSheet(); act({ type: 'drop', lot: from, to: i }); return; }
+    if (sel != null && sel !== i) closeSheet();
+    if (b && F.renting && b.pile >= 1) { if (welcome) { welcome = null; $('welcome').classList.remove('show'); act({ type: 'collectAll' }); } else act({ type: 'collect', lot: i }); return; }
+    if (!L.open) { const next = city.lots.findIndex(x => !x.open); if (i !== next) { say('Buy the land in order, from the left'); return; } sel = null; openSheet('lot', i); return; }
+    if (!b) { if (!F.merging) { sel = null; openSheet('lot', i); } else if (sheet) closeSheet(); return; }
+    if (sel === i) { closeSheet(); return; }
+    sel = i; openSheet('lot', i); renderLots(city);
+  }
+  $('street').addEventListener('click', e => {
+    const el = e.target.closest('.place'); if (!el || readOnly) return; const id = el.dataset.place;
+    if (city.deal) return;
+    if (id === 'hall') { if (!act({ type: 'grant' })) say(`Town Hall pays a grant every ${GRANT_EVERY}s`, ''); return; }
+    if (id === 'work') { if (!act({ type: 'work' })) say(`Working… ${Math.ceil(city.job.shift)}s left`, ''); return; }
+    if (id === 'market') { if (city.market.offer) { act({ type: 'dealOpen', kind: 'market' }); openSheet('deal'); } else say('Nothing for sale yet. Check back soon', ''); return; }
+    sel = null; openSheet(id);
+  });
+  $('sheet').addEventListener('click', e => {
+    const el = e.target.closest('[data-act]'); if (!el || el.disabled) return; const a = el.dataset.act, arg = el.dataset.arg;
+    if (a === 'close') { closeSheet(); renderAll(); return; }
+    if (a === 'tenant') { const [i, choice] = arg.split(':'); if (choice === 'close') { closeSheet(); return; } act({ type: 'tenant', i: +i, choice }); if (choice !== 'check') { renderSheet(city, true); } return; }
+    if (a === 'haggleLand') { act({ type: 'dealOpen', kind: 'land', lot: +arg }); renderSheet(city, true); return; }
+    if (a === 'haggleSell') { act({ type: 'dealOpen', kind: 'sell' }); renderSheet(city, true); return; }
+    if (a === 'dealPush') { act({ type: 'dealPush', amount: +arg }); if (!city.deal) closeSheet(); else renderSheet(city, true); return; }
+    if (a === 'dealAccept') { act({ type: 'dealAccept' }); if (!city.deal) closeSheet(); else renderSheet(city, true); return; }
+    if (a === 'study') { act({ type: 'study', k: arg }); renderSheet(city, true); return; }
+    const ok = act({ type: a, lot: +arg });
+    if (ok && (a === 'buyLand' || a === 'build' || a === 'evict')) closeSheet(); else renderSheet(city, true);
+  });
+
+  // ---------- hidden settings: hold the coin counter for 2 seconds, or #settings / ?settings ----------
+  let holdT = null;
+  $('coins').addEventListener('pointerdown', e => { e.preventDefault(); $('coins').classList.add('holding'); holdT = setTimeout(() => { $('coins').classList.remove('holding'); openSettings(); }, 2000); });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => $('coins').addEventListener(t, () => { clearTimeout(holdT); $('coins').classList.remove('holding'); }));
+  const FLAG_INFO = {
+    merging: ['🧩 Merging', 'Off: build and upgrade with coins'], renting: ['🪙 Renting', 'Off: income from merges, wages and Town Hall'],
+    tenants: ['🧑 Tenants', 'Off: every building is let'], deals: ['🤝 Deals', 'Off: land at sticker price, no market'],
+    jobs: ['💼 Jobs and skills', 'Off: no Work or School'], away: ['😴 Earning while away', 'Off: the clock stops when closed'],
+  };
+  function openSettings() { renderSettings(); $('setOv').classList.add('show'); if (sheet) closeSheet(); }
+  function renderSettings() {
+    $('togs').innerHTML = FLAG_KEYS.map(k => { const on = k in overrides ? !!overrides[k] : !!FEATURES[k], dif = k in overrides && !!overrides[k] !== !!FEATURES[k];
+      const dep = k === 'tenants' && !F.renting;
+      return `<div class="tog"><div><b>${FLAG_INFO[k][0]}</b>${dif ? ' <span class="dif">● changed</span>' : ''}<small>${dep ? 'Needs renting on' : FLAG_INFO[k][1]}</small></div>
+        <button class="sw${on ? ' on' : ''}" data-flag="${k}" role="switch" aria-checked="${on}" aria-label="${FLAG_INFO[k][0]}"></button></div>`; }).join('');
+  }
+  function setFlags(next) {
+    FLAG_KEYS.forEach(k => { if (k in next) overrides[k] = !!next[k]; }); saveFlags(); computeFlags();
+    if (!F.merging) { city.queue = 0; city.chain = null; }
+    if (!F.deals && city.deal) city.deal = null;
+    lotKeys.length = 0; Object.keys(placeKeys).forEach(k => delete placeKeys[k]); renderAll();
+  }
+  $('setOv').addEventListener('click', e => {
+    const sw = e.target.closest('[data-flag]'); if (sw) { const k = sw.dataset.flag; const cur = k in overrides ? !!overrides[k] : !!FEATURES[k]; setFlags({ [k]: !cur }); renderSettings(); return; }
+    const t = e.target.closest('[data-tool]'); if (!t) return;
+    switch (t.dataset.tool) {
+      case 'defaults': overrides = {}; saveFlags(); computeFlags(); setFlags({}); renderSettings(); break;
+      case 'coins': city.coins += 1000; renderAll(); say('+1,000 coins'); break;
+      case 'hour': $('setOv').classList.remove('show'); city.lastSeen = Date.now() - 3600 * 1000; checkAway(); break;
+      case 'applicant': if (F.tenants) { city.applicants.push({ ...newTenant(), wait: 0, check: null }); city.applicants = city.applicants.slice(-APPLICANT_MAX); renderAll(); say('An applicant is at the bus stop'); } break;
+      case 'buyer': if (F.deals) { if (sendBuyer(city)) say('A buyer 🤝 arrived'); else say('Build a bigger building first'); playEvents(); renderAll(); } break;
+      case 'seller': if (F.deals) { city.market.offer = { lv: Math.max(0, city.tallest - 1), t: MARKET_STAYS }; renderAll(); say('The 🏪 market has a building'); } break;
+      case 'reset': if (t.dataset.armed) { store.clear(); city = newCity(); lotKeys.length = 0; renderAll(); $('setOv').classList.remove('show'); delete t.dataset.armed; t.textContent = 'Reset city'; }
+        else { t.dataset.armed = 1; t.textContent = 'Tap again to reset'; } break;
+      case 'close': $('setOv').classList.remove('show'); break;
+    }
+  });
+
+  // ---------- earning while away ----------
+  function checkAway() {
+    const away = (Date.now() - (city.lastSeen || Date.now())) / 1000;
+    city.lastSeen = Date.now();
+    if (!F.away || !F.renting || away < AWAY_MIN_SECONDS) return 0;
+    const secs = Math.min(away, AWAY_CAP_HOURS * 3600); let total = 0;
+    city.lots.forEach(l => { const b = l.b; if (!b) return; const r = rentRate(city, b, true); if (r <= 0) return;
+      const n = r * secs * AWAY_RATE * (needsTenant(b) && b.tenant && b.tenant.q === 'bad' ? 1 - AWAY_BAD_CUT : 1); b.pile += n; total += n; });
+    if (total < 1) return 0;
+    welcome = `😴 Away ${fmtTime(away)}: 🪙 ${fmt(total)} waiting. Tap a 💰 sack!`;
+    $('welcome').textContent = welcome + (away > secs ? ` (earning stops after ${AWAY_CAP_HOURS}h)` : ''); $('welcome').classList.add('show');
+    lotKeys.length = 0; renderAll(); store.save(city); return total;
+  }
+  $('welcome').addEventListener('click', () => { welcome = null; $('welcome').classList.remove('show'); act({ type: 'collectAll' }); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) store.save(city); else { checkAway(); last = performance.now(); } });
+  addEventListener('pagehide', () => store.save(city));
+
+  // ---------- loop ----------
+  function renderAll() { renderTop(city); renderLots(city); renderStreet(city); renderMsg(city); renderSheet(city); }
+  let last = performance.now(), saveT = 0, uiT = 0;
+  function frame(now) {
+    const dt = Math.min(0.25, (now - last) / 1000); last = now;
+    if (!readOnly && !$('setOv').classList.contains('show')) { step(city, dt); if (events.length) playEvents(); }
+    uiT += dt; if (uiT > 0.12) { uiT = 0; renderAll(); }
+    else { const tr = $('truck'); if (tr && F.merging) tr.style.left = `calc(${(1 - city.spawnT / SPAWN_EVERY) * 100}% - 18px)`; }
+    saveT += dt; if (saveT > SAVE_EVERY) { saveT = 0; store.save(city); }
+    requestAnimationFrame(frame);
+  }
+
+  // test hook (for the automated smoke test)
+  window.__cb = {
+    get state() { return JSON.parse(JSON.stringify(city)); }, get flags() { return { ...F }; }, get sheet() { return sheet && sheet.kind; },
+    dispatch(a) { return act(a); }, setFlags(f) { setFlags(f); }, clearFlags() { overrides = {}; saveFlags(); computeFlags(); setFlags({}); },
+    advance(sec) { for (let t = 0; t < sec; t += 0.1) step(city, 0.1); playEvents(); renderAll(); },
+    leave(sec) { city.lastSeen = Date.now() - sec * 1000; try { localStorage.setItem(STORE, JSON.stringify(city)); } catch (e) {} readOnly = true; frozen = true; },
+    give(n) { city.coins += n; renderAll(); }, centre(i) { return centre(i); }, seed(n) { seed = n >>> 0; },
+    place(id) { const r = placeEls[id].getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; },
+    income() { return incomePerMin(city); }, landPrice() { return landPrice(city); }, openSettings,
+  };
+
+  buildMap(); layout(); addEventListener('resize', () => { layout(); });
+  renderAll(); checkAway();
+  if (/settings/.test(location.hash + location.search)) openSettings();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
