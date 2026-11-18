@@ -82,6 +82,8 @@
   #sheet { position: fixed; left: 0; right: 0; bottom: 0; margin: 0 auto; max-width: 480px; background: var(--panel); border-radius: 20px 20px 0 0; z-index: 9;
     padding: 14px 14px calc(14px + env(safe-area-inset-bottom)); box-shadow: 0 -10px 30px rgba(0,0,0,.45); transform: translateY(110%); transition: transform .18s ease-out; }
   #sheet.show { transform: none; }
+  #sheet:not(.show) { pointer-events: none; }
+  #sheetBody { max-height: min(58vh, 360px); overflow-y: auto; touch-action: pan-y; }
   #sheet h3 { margin: 0 34px 4px 0; font-size: 19px; }
   #sheet p { margin: 4px 0; font-size: 15px; color: var(--muted); line-height: 1.35; }
   #sheet p b { color: var(--text); }
@@ -834,7 +836,7 @@ const SOUND_ON          = true;
     if (city.deal) return;
     if (id === 'hall') { if (!act({ type: 'grant' })) say(`Town Hall pays a grant every ${GRANT_EVERY}s`, ''); return; }
     if (id === 'work') { if (!act({ type: 'work' })) say(`Working… ${Math.ceil(city.job.shift)}s left`, ''); return; }
-    if (id === 'market') { if (city.market.offer) { act({ type: 'dealOpen', kind: 'market' }); openSheet('deal'); } else say('Nothing for sale yet. Check back soon', ''); return; }
+    if (id === 'market') { if (city.market.offer && !empties(city).length) { say('Make room on the map first, then buy', 'warn'); return; } if (city.market.offer) { act({ type: 'dealOpen', kind: 'market' }); openSheet('deal'); } else say('Nothing for sale yet. Check back soon', ''); return; }
     sel = null; openSheet(id);
   });
   $('sheet').addEventListener('click', e => {
@@ -925,7 +927,7 @@ const SOUND_ON          = true;
     leave(sec) { city.lastSeen = Date.now() - sec * 1000; try { localStorage.setItem(STORE, JSON.stringify(city)); } catch (e) {} readOnly = true; frozen = true; },
     give(n) { city.coins += n; renderAll(); }, centre(i) { return centre(i); }, seed(n) { seed = n >>> 0; },
     place(id) { const r = placeEls[id].getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; },
-    income() { return incomePerMin(city); }, landPrice() { return landPrice(city); }, openSettings,
+    income() { return incomePerMin(city); }, resetCity() { store.clear(); city = newCity(); lotKeys.length = 0; renderAll(); }, landPrice() { return landPrice(city); }, openSettings,
   };
 
   buildMap(); layout(); addEventListener('resize', () => { layout(); });
