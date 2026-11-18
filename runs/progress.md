@@ -25,7 +25,7 @@ Working branch: `claude/awesome-sagan-qgefe9`, kept rebased on the GitHub Pages 
 | 4 | City Builder v1, part 1: map, merging, renting, flags, settings screen | 30 min | done |
 | 5 | City Builder v1, part 2: tenants, deals, jobs and skills, away | 30 min | done (written with part 1) |
 | 6 | City Builder smoke test on phones (all-on, all-off, mixed flags); fix layout | 30 min | done |
-| 7 | Home page "New", RATING-SHEET.md, RUN-LOG.md, README; final report | 20 min | next |
+| 7 | Home page "New", RATING-SHEET.md, RUN-LOG.md, README; final report | 20 min | done |
 
 ## Later (not this run)
 - Second review pass on Math Ring (feel test with real players, especially children).
@@ -33,7 +33,19 @@ Working branch: `claude/awesome-sagan-qgefe9`, kept rebased on the GitHub Pages 
 
 ## Log
 - 03:30 Resumed. Math Ring smoke tests re-run: `smoke-test-2.js math-ring` and `smoke-math-ring.js` both pass, screenshots at 360x640 checked.
-- 03:55 Train Switcher committed. New `smoke-train-switcher.js` passes (68 checks, all three themes, 3 phone sizes). The old `smoke-test-2.js train-switcher` bot is flaky at level 4 on the *original* game too (its 40ms polling bot sometimes misroutes); it passed 2 of 2 runs on the new version. Screenshots at 360x640 checked for trains, boats and planes.
-- 03:50 City Builder spec written (`docs/city-builder-spec.md`), from the puzzle-first and landlord-economy designs; the map-first design and the synthesis never ran.
+- ~03:40 Train Switcher committed. New `smoke-train-switcher.js` passes (68 checks, all three themes, 3 phone sizes). The old `smoke-test-2.js train-switcher` bot is flaky at level 4 on the *original* game too (its 40ms polling bot sometimes misroutes); it passed 2 of 2 runs on the new version. Screenshots at 360x640 checked for trains, boats and planes.
+- ~03:42 City Builder spec written (`docs/city-builder-spec.md`), from the puzzle-first and landlord-economy designs; the map-first design and the synthesis never ran.
 - 03:47 City Builder v1 written in one pass (all six systems, flags, hidden settings). First phone check at 360x640: merge, chain and auto move-in work, no console errors. Not yet smoke-tested across flag combinations.
 - 03:52 City Builder smoke test `tools/smoke-city-builder.js` passes: 364 checks, 4 phone sizes, full all-on session, settings screen, and all 64 flag combinations grow without a dead end; no console errors. Fixes from it: a closing bottom sheet no longer swallows taps; long sheets scroll so buttons stay on small phones; the market won't open a deal when there's no room for the building.
+- Home page lists City Builder first under "New"; README, RATING-SHEET.md (City Builder row plus a "which features make it fun" table) and RUN-LOG.md updated.
+
+## Handover
+**Done:** Math Ring faster ramp, Train Switcher big arrows + themes, City Builder spec and v1, all smoke-tested on emulated phones and pushed to `claude/awesome-sagan-qgefe9`.
+
+**Blocked:** none. Not yet on the GitHub Pages branch `claude/intelligent-lamport-sbfavc`: this run only pushes to its own branch. The branch is a clean fast-forward of the Pages branch, so publishing is one fast-forward merge once Miki says go.
+
+**Left / next run:**
+- Play-test City Builder numbers (all are paper estimates): houses every 3s may fill the map too fast for a casual player; pile labels on every house make the map busy.
+- One feel review of Math Ring with real players (the reviewer passes from the first attempt never ran).
+- `tools/smoke-test-2.js train-switcher`: its 40ms polling bot sometimes misroutes at level 4, on the old game too. Use `smoke-train-switcher.js` instead, or slow the old bot.
+- City Builder friends' visits and trading: structure only.

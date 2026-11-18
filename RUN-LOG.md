@@ -6,3 +6,4 @@ One row per overnight run. Miki fills in the verdict column so future runs learn
 |---|---|---|---|
 | 2026-11-04 | Brief 1: three mobile game prototypes | Glow Grid, Pulse, Math Sprint 60, READMEs, rating sheet, smoke test ([report](reports/2026-11-04-morning-report.md)) | _(pending)_ |
 | 2026-11-11 | Five more prototypes | Math Ring, Tower Drop, Train Switcher, Merge a City, Property Tycoon, smoke test `tools/smoke-test-2.js` | _(pending)_ |
+| 2026-11-18 | City Builder (Merge a City + Property Tycoon, feature switches); Train Switcher big arrows + themes; Math Ring faster ramp | City Builder + spec (`docs/city-builder-spec.md`), Train Switcher themes (trains, boats, planes), Math Ring adaptive difficulty, smoke tests `smoke-city-builder.js`, `smoke-train-switcher.js`, `smoke-math-ring.js` ([progress](runs/progress.md)). First attempt hit the usage limit; resumed and finished. | _(pending)_ |
