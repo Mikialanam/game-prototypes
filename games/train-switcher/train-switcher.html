@@ -61,6 +61,8 @@
   .card h2.withgear { min-height: 44px; display: flex; align-items: center; justify-content: center; padding: 0 42px; }
   .gear:active { transform: scale(.94) rotate(30deg); }
   #setOv { z-index: 18; }
+  .soundbtn { min-height: 56px; font-size: 18px; margin-top: 2px; }
+  .soundbtn[aria-pressed="false"] { color: var(--muted); border-style: dashed; }
   /* switch controls picker: one big row per mode */
   .cpicker { display: grid; gap: 8px; margin: 6px 0 8px; }
   .cpicker .pick { flex-direction: row; justify-content: flex-start; gap: 12px; min-height: 68px; padding: 8px 12px; text-align: left; }
@@ -154,6 +156,8 @@
     <h2>⚙️ Settings</h2>
     <p class="plabel">Switch controls</p>
     <div class="cpicker"></div>
+    <p class="plabel">Sound</p>
+    <button class="btn ghost line soundbtn" id="soundBtn" aria-pressed="true">🔊 Sound on</button>
     <button class="btn ghost line" id="hintsAgain">Show the first-time hint again</button>
     <button class="btn" id="setDone">Done</button>
   </div>
@@ -243,7 +247,7 @@ const LEVER_TILT             = 34;   // degrees the lever leans left or right: i
 const LEVER_TAP_R            = 50;   // px: a tap or drag starting this close to a lever moves it (nearest lever wins)
 const LEVER_DRAG             = 14;
 const HINT_WAIT              = 2.2;  // seconds the first vehicle waits on level 1 while the first-time hint shows   // px a finger must slide sideways to push the lever over   // px: length of the moving piece of track at each switch (rail and lever modes)
-const SOUND_ON               = true;
+const SOUND_ON               = true;   // false = no sound at all (players can also turn sound off in Settings)
 // =====================================================
 
 (() => {
@@ -252,12 +256,26 @@ const SOUND_ON               = true;
   const load = () => { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch (e) { return {}; } };
   const save = s => { try { localStorage.setItem(STORE, JSON.stringify(s)); } catch (e) {} };
   const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
-  let ac = null;
+  let ac = null, soundsPlayed = 0;
+  const soundOn = () => SOUND_ON && !load().muted;
   function beep(freq, dur = 0.08, type = 'triangle', vol = 0.15) {
-    if (!SOUND_ON) return;
+    if (!soundOn()) return; soundsPlayed++;
     try { ac = ac || new (window.AudioContext || window.webkitAudioContext)();
       const o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.value = freq; g.gain.value = vol;
       g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + dur); o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + dur);
+    } catch (e) {}
+  }
+  // the switch moving: a short "clack-clack" like toy-train points (two filtered noise ticks)
+  function clack() {
+    if (!soundOn()) return; soundsPlayed++;
+    try { ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      [[2600, 0, .55], [1400, .055, .4]].forEach(([freq, at, vol]) => {
+        const n = Math.floor(ac.sampleRate * .03), buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
+        for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 5);
+        const src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+        src.buffer = buf; f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 1.4; g.gain.value = vol;
+        src.connect(f); f.connect(g); g.connect(ac.destination); src.start(ac.currentTime + at);
+      });
     } catch (e) {}
   }
   const fx = $('fx'), fctx = fx.getContext('2d'); let bits = [], fxOn = false;
@@ -432,7 +450,7 @@ const SOUND_ON               = true;
       else { sw.shake = 1; beep(130, .14, 'square', .07); buzz([25, 30, 25]); }   // gentle rule: it shakes, says no, and stays put
       return;
     }
-    sw.state = 1 - sw.state; sw.pulse = 1; beep(440, .05, 'square', .06); buzz(6);
+    sw.state = 1 - sw.state; sw.pulse = 1; clack(); buzz(6);
     if (hintOn) { hintOn = false; const s = load(); s.hints = s.hints || {}; s.hints[ctrlName] = true; save(s); }   // they've done it once: no more hint for this mode
   }
 
@@ -576,6 +594,10 @@ const SOUND_ON               = true;
   function closeSettings() { $('setOv').classList.remove('show'); paused = setWasPaused; }
   document.querySelectorAll('.setOpen').forEach(b => b.addEventListener('click', openSettings));
   $('setDone').addEventListener('click', closeSettings);
+  // Sound on / off: saved on the device; off silences every sound in the game (vibration stays)
+  function showSound() { const on = !load().muted; $('soundBtn').textContent = on ? '🔊 Sound on' : '🔇 Sound off'; $('soundBtn').setAttribute('aria-pressed', on); }
+  $('soundBtn').addEventListener('click', () => { const s = load(); s.muted = !s.muted; save(s); showSound(); clack(); });
+  showSound();
   $('hintsAgain').addEventListener('click', () => { const s = load(); delete s.hints; save(s); resetHint();
     $('hintsAgain').textContent = 'Hints will show on level 1 ✓'; beep(600, .06); });
 
@@ -968,7 +990,7 @@ const SOUND_ON               = true;
     get theme() { return themeName; }, setTheme(name) { return setTheme(name); },
     get difficulty() { return diffName; }, setDifficulty(name) { return setDifficulty(name); }, get crash() { return D.crash; }, get speed() { return speedName; }, setSpeed(name) { return setSpeed(name); }, cfg(n) { return levelCfg(n); },
     get hint() { const h = hintSpot(); return { on: hintOn, spot: h && { x: cv.getBoundingClientRect().left + h.x, y: cv.getBoundingClientRect().top + h.y, slide: h.slide }, caption: $('hint').classList.contains('show') ? $('hint').textContent : '' }; },
-    _switch(id) { return nodes[id]; },   // tests only: set a switch's starting position
+    _switch(id) { return nodes[id]; }, get sound() { return soundOn(); }, get soundsPlayed() { return soundsPlayed; },   // tests only: set a switch's starting position
     get controls() { return ctrlName; }, setControls(name) { return setControls(name); },
     get paused() { return paused; }, start(n) { start(Math.max(1, n | 0)); },
     layout() {   // sizes the layout test checks: switch buttons, tap reach and the boxes the stations fill

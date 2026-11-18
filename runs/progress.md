@@ -11,7 +11,7 @@ Stay on scope: only Train Switcher.
 | # | Step | Estimate | Status |
 |---|---|---|---|
 | 1 | Check what's already done against the brief; write this plan | 5 min | done |
-| 2 | Switch click sound; Sound on/off toggle in Settings (saved) that silences every sound | 15 min | |
+| 2 | Switch click sound; Sound on/off toggle in Settings (saved) that silences every sound | 15 min | done |
 | 3 | Very easy level 1 for every difficulty: one switch, two stations, slow, 3 trains, wide gaps | 15 min | |
 | 4 | Active route highlight: glow the whole path from the entry to the station a train would reach now, and light that station | 20 min | |
 | 5 | Tutorial: the hand demonstrates one flip (the track moves), then hands over to the player and disappears after their flip | 25 min | |
@@ -23,6 +23,7 @@ Stay on scope: only Train Switcher.
 
 ## Log
 - 23:05 Previous run's work is live (game and home page). Gaps found: no mute toggle, flip sound is a beep not a click, level 1 is only easy on Kid, glow covers each switch's branch rather than the route, hint points but doesn't demonstrate.
+- 23:15 Switch flips now play a short two-tick "clack-clack" (filtered noise, like toy points) instead of a beep. Settings has a Sound on/off button, saved as `muted`; off silences every sound (vibration stays). Settings card still fits on iPhone SE. Next: easy level 1.
 
 ---
 
