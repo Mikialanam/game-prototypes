@@ -412,6 +412,12 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
   }
   function updateBar() { $('lvl').textContent = 'Level ' + level; $('count').textContent = `${T.countIcon} ${delivered} / ${cfg.trains}`; }
 
+  // the way a vehicle entering now would go: edges as "node>branch" and the station it ends at
+  function activeRoute() {
+    const edges = []; let id = 'e';
+    while (nodes[id].next) { const n = nodes[id], i = n.kind === 'switch' ? n.state : 0; edges.push(id + '>' + i); id = n.next[i]; }
+    return { edges, station: id };
+  }
   // which branch of switch s leads to the station of this colour
   function branchFor(s, colour) { const reaches = id => { const n = nodes[id]; return n.kind === 'station' ? n.colour === colour : n.next.some(reaches); }; return s.next.findIndex(reaches); }
   function spawn() {
@@ -896,11 +902,15 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
         E.push({ A, B, L: len, ux: (B.x - A.x) / len, uy: (B.y - A.y) / len, sw: n.kind === 'switch', s: n, i, on: n.kind !== 'switch' || i === n.state }); }); }
     ctx.clearRect(0, 0, W, H);
     L.ground();
-    // the branch each switch is set to glows, so the way ahead is easy to see (and flashes when tapped)
+    // the active route (entry to the station a vehicle would reach right now) glows brightly and its station gets a halo;
+    // a switch's set branch off that route glows faintly; a tapped branch flashes
+    const rt = activeRoute(), onRoute = new Set(rt.edges), glow = .26 + .1 * Math.sin(clock * 4);
     ctx.lineCap = 'round';
-    E.forEach(e => { if (!e.sw) return; const f = e.s.flash && e.s.flash.i === e.i ? 1 - e.s.flash.t / .5 : 0;
-      if (!e.on && !f) return;
-      ctx.strokeStyle = `rgba(255,255,255,${(e.on ? .2 + .08 * Math.sin(clock * 4) : 0) + f * .35})`; ctx.lineWidth = 54; line(e.A.x, e.A.y, e.B.x, e.B.y); });
+    E.forEach(e => { const f = e.sw && e.s.flash && e.s.flash.i === e.i ? 1 - e.s.flash.t / .5 : 0, r = onRoute.has(e.s.id + '>' + e.i);
+      const a = (r ? glow : e.sw && e.on ? .1 : 0) + f * .35; if (!a) return;
+      ctx.strokeStyle = `rgba(255,255,255,${a})`; ctx.lineWidth = 54; line(e.A.x, e.A.y, e.B.x, e.B.y); });
+    if (phase === 'play') { const p = P(rt.station); const g = ctx.createRadialGradient(p.x, p.y, 10, p.x, p.y, 62 * stS);
+      g.addColorStop(0, `rgba(255,255,255,${glow + .1})`); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g; circle(p.x, p.y, 62 * stS); ctx.fill(); }
     L.paths(E);
     // each switch: the closed side is marked "off" (arrow mode) or dimmed (rail and lever modes); the open side gets marching chevrons
     const arrows = ctrlName === 'arrow';
@@ -994,7 +1004,7 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
     get theme() { return themeName; }, setTheme(name) { return setTheme(name); },
     get difficulty() { return diffName; }, setDifficulty(name) { return setDifficulty(name); }, get crash() { return D.crash; }, get speed() { return speedName; }, setSpeed(name) { return setSpeed(name); }, cfg(n) { return levelCfg(n); },
     get hint() { const h = hintSpot(); return { on: hintOn, spot: h && { x: cv.getBoundingClientRect().left + h.x, y: cv.getBoundingClientRect().top + h.y, slide: h.slide }, caption: $('hint').classList.contains('show') ? $('hint').textContent : '' }; },
-    _switch(id) { return nodes[id]; }, get sound() { return soundOn(); }, get soundsPlayed() { return soundsPlayed; },   // tests only: set a switch's starting position
+    _switch(id) { return nodes[id]; }, get route() { return activeRoute(); }, get sound() { return soundOn(); }, get soundsPlayed() { return soundsPlayed; },   // tests only: set a switch's starting position
     get controls() { return ctrlName; }, setControls(name) { return setControls(name); },
     get paused() { return paused; }, start(n) { start(Math.max(1, n | 0)); },
     layout() {   // sizes the layout test checks: switch buttons, tap reach and the boxes the stations fill
