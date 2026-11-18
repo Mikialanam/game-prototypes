@@ -244,12 +244,15 @@ const DEFAULT_CONTROLS       = 'rail';
 const SWITCH_MOVE_TIME       = 0.3;  // seconds a switch takes to swing across, so you can see what your tap did (all modes)
 const RAIL_TAP_WIDTH         = 56;   // px either side of a branch's centre line that counts as tapping that branch (rail mode)
 const HUB_TAP_R              = 40;   // px: tapping the switch itself, not clearly on either branch, flips it (rail mode)
-const POINTS_LEN             = 46;
+const POINTS_LEN             = 46;   // px: length of the moving piece of track at each switch (rail and lever modes)
 const LEVER_SIZE             = 1;    // lever scale (1 = base 50px wide, knob 26px across on a 360px-wide phone)
 const LEVER_TILT             = 34;   // degrees the lever leans left or right: it leans the way the track goes
 const LEVER_TAP_R            = 50;   // px: a tap or drag starting this close to a lever moves it (nearest lever wins)
-const LEVER_DRAG             = 14;
-const HINT_WAIT              = 2.2;  // seconds the first vehicle waits on level 1 while the first-time hint shows   // px a finger must slide sideways to push the lever over   // px: length of the moving piece of track at each switch (rail and lever modes)
+const LEVER_DRAG             = 14;   // px a finger must slide sideways to push the lever over
+// First-time tutorial (level 1, per control mode, until level 1 has been won once in that mode): one hand glides in, shows a single
+// switch flip with the selected control (the switch really moves), then fades away. Times in seconds from the start of level 1.
+const TUTORIAL               = { start: 0.5, arrive: 1.3, press: 1.9, leave: 3.1, gone: 3.7 };
+const HINT_WAIT              = 3.4;  // seconds the first vehicle waits on level 1 while the tutorial plays
 const SOUND_ON               = true;   // false = no sound at all (players can also turn sound off in Settings)
 // =====================================================
 
@@ -315,7 +318,7 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
 
   // ---------- state ----------
   let phase = 'menu', level = 1, cfg, nodes, switches, trains, spawned, delivered, spawnT, last, crashAt, flashes;
-  let hintOn = false, firstColour = null;                                // first-time hint (level 1 only, once per control mode)
+  let hintOn = false, firstColour = null, tut = null;                    // first-time tutorial (level 1 only): tut = { t, spot, flipped }
   let gesture = null;                                                    // a finger held on a lever (lever mode)
   let paused = false, clock = 0, ripples = [], decor = [], card = null;  // card: what the win / fail card is showing
   let swR = 40, tapR = TAP_RADIUS, stS = 1;                              // switch radius, tap reach, station scale: worked out from the screen
@@ -445,7 +448,7 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
   const hintSeen = () => !!(load().hints || {})[ctrlName];
   function start(n) {
     level = n; buildLevel(); phase = 'play'; paused = false; card = null; gesture = null;
-    hintOn = level === 1 && !hintSeen(); firstColour = null;
+    hintOn = level === 1 && !hintSeen(); firstColour = null; tut = hintOn ? { t: -TUTORIAL.start } : null;
     if (hintOn) {   // the first vehicle waits a moment, and the first switch starts the wrong way for it, so the hint shows a move that matters
       const st = Object.values(nodes).filter(k => k.kind === 'station'), target = st[Math.floor(Math.random() * st.length)], s1 = nodes[nodes.e.next[0]];
       firstColour = target.colour; s1.state = s1.anim = 1 - branchFor(s1, firstColour); spawnT = HINT_WAIT;
@@ -453,15 +456,15 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
     ['startOv', 'winOv', 'failOv', 'themeOv'].forEach(id => $(id).classList.remove('show'));
   }
 
-  function flip(sw) {
+  function flip(sw, demo = false) {
     if (phase !== 'play') return;
+    if (!demo && tut) { tut = null; hintOn = false; }   // the player moved a switch themselves: the hand gets out of the way
     if (occupied(sw)) {
       if (D.crash) { const p = P(sw.id); crash(p.x, p.y); }
       else { sw.shake = 1; beep(130, .14, 'square', .07); buzz([25, 30, 25]); }   // gentle rule: it shakes, says no, and stays put
       return;
     }
     sw.state = 1 - sw.state; sw.pulse = 1; clack(); buzz(6);
-    if (hintOn) { hintOn = false; const s = load(); s.hints = s.hints || {}; s.hints[ctrlName] = true; save(s); }   // they've done it once: no more hint for this mode
   }
 
   // rail mode: the player tapped branch i of a switch. If it already goes that way, just say "yes, this way".
@@ -482,6 +485,8 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
   function fail(kind) { card = { kind }; renderCard(); $('failOv').classList.add('show'); }
   function win() {
     phase = 'win';
+    if (level === 1) { const s = load(); s.hints = s.hints || {}; s.hints[ctrlName] = true; save(s); }   // level 1 won in this mode: no more tutorial for it
+    tut = null; hintOn = false;
     const s = load(); s.bests = s.bests || {}; const isBest = level > (s.bests[diffName] || 0); if (isBest) s.bests[diffName] = level; save(s); updatePill();
     card = { kind: 'win', isBest }; renderCard();
     const nb = $('winNew'); nb.classList.remove('pop'); void nb.offsetWidth; if (isBest) nb.classList.add('pop');
@@ -584,7 +589,7 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
     document.querySelectorAll('.cpicker .pick').forEach(b => { const on = b.dataset.ctrl === name; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
     $('howTo').textContent = C.how;
     if (nodes) measure();
-    if (phase === 'play' && level === 1) hintOn = !hintSeen();
+    if (phase === 'play' && level === 1) { hintOn = !hintSeen(); tut = hintOn ? { t: 0 } : null; }
     return true;
   }
   document.querySelectorAll('.cpicker').forEach(box => {
@@ -611,11 +616,12 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
   $('hintsAgain').addEventListener('click', () => { const s = load(); delete s.hints; save(s); resetHint();
     $('hintsAgain').textContent = 'Hints will show on level 1 ✓'; beep(600, .06); });
 
-  function resetHint() { if (phase === 'play' && level === 1) hintOn = true; }
+  function resetHint() { if (phase === 'play' && level === 1) { hintOn = true; tut = { t: 0 }; } }
   // ---------- loop ----------
   function frame(now) {
     const dt = Math.min(.05, (now - (last || now)) / 1000); last = now; clock += dt;
     if (phase === 'play' && !paused) {
+      tutorialStep(dt);
       spawnT -= dt;
       if (spawned < cfg.trains && spawnT <= 0) { spawn(); spawnT = cfg.gap; }
       for (const t of [...trains]) {
@@ -848,7 +854,7 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
     ctx.restore();
     ctx.fillStyle = '#1d1d1d'; circle(x, y, 5 * k); ctx.fill();                                                                // pivot
   }
-  // first-time hint: where to put a finger for the move the next vehicle needs (null when the switch is already right)
+  // first-time tutorial: where the hand shows the move the first vehicle needs (null when the switch is already right)
   function hintSpot() {
     if (!hintOn || phase !== 'play') return null;
     const s = nodes[nodes.e.next[0]], A = P(s.id);
@@ -856,26 +862,48 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
     const colour = next ? next.colour : firstColour; if (!colour) return null;
     const want = branchFor(s, colour); if (want < 0 || want === s.state) return null;
     if (ctrlName === 'rail') { const B = P(s.next[want]), len = Math.hypot(B.x - A.x, B.y - A.y), k = Math.min(.45, 105 / len);
-      return { x: A.x + (B.x - A.x) * k, y: A.y + (B.y - A.y) * k, slide: 0 }; }
-    if (ctrlName === 'lever') return { x: s.lv.x, y: s.lv.y - leverR() * 1.1, slide: P(s.next[want]).x > P(s.next[s.state]).x ? 1 : -1 };
-    return { x: A.x + swR * .25, y: A.y + swR * .25, slide: 0 };
+      return { s, want, x: A.x + (B.x - A.x) * k, y: A.y + (B.y - A.y) * k, slide: 0 }; }
+    if (ctrlName === 'lever') return { s, want, x: s.lv.x, y: s.lv.y - leverR() * 1.1, slide: P(s.next[want]).x > P(s.next[s.state]).x ? 1 : -1 };
+    return { s, want, x: A.x + swR * .25, y: A.y + swR * .25, slide: 0 };
+  }
+  // The tutorial's clock: it waits until there is a move worth showing, then plays once. At TUTORIAL.press the switch really flips
+  // (same movement, glow and clack as a player's flip); after TUTORIAL.gone the hand is gone for good.
+  function tutorialStep(dt) {
+    if (!tut) return;
+    if (!tut.spot) { if (tut.t < 0) { tut.t += dt; return; } tut.spot = hintSpot(); if (!tut.spot) return; }
+    const before = tut.t; tut.t += dt;
+    const flipAt = TUTORIAL.press + (tut.spot.slide ? .15 : 0);
+    if (!tut.flipped && before < flipAt && tut.t >= flipAt) {
+      tut.flipped = true; const s = tut.spot.s;
+      if (s.state !== tut.spot.want) { if (ctrlName === 'rail') s.flash = { i: tut.spot.want, t: 0 }; if (!tut.spot.slide) ripples.push({ x: tut.spot.x, y: tut.spot.y, t: 0, hit: true }); flip(s, true); }
+    }
+    if (tut.t >= TUTORIAL.gone) { tut = null; hintOn = false; }
   }
   function drawHint() {
-    const h = hintSpot(), cap = $('hint');
-    cap.classList.toggle('show', !!h);
-    if (!h) return;
+    const cap = $('hint'), h = tut && tut.spot, t = tut ? tut.t : -1, on = !!h && t < TUTORIAL.leave + .3;
+    cap.classList.toggle('show', on);
+    if (!h || t < 0) return;
     const txt = C.hint.replace('{one}', T.one); if (cap.textContent !== txt) cap.textContent = txt;
-    const k = (clock % 1.4) / 1.4;                                   // one "tap" (or one push) every 1.4 seconds
-    const press = k < .5 ? Math.sin(k / .5 * Math.PI) : 0, slide = h.slide ? Math.min(1, k / .6) * 30 * h.slide : 0;
-    if (!h.slide) { ctx.strokeStyle = `rgba(255,255,255,${(1 - k) * .9})`; ctx.lineWidth = 4; circle(h.x, h.y, 10 + k * 34); ctx.stroke(); }
-    else { ctx.globalAlpha = .9; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 5; ctx.lineCap = 'round';      // a curved "push this way" arrow
-      const cx = h.x, cy = h.y + 30, R = 50, end = .6, tx = Math.cos(end) * h.slide, ty = Math.sin(end);                 // arc over the knob, head at the far end
+    const U = TUTORIAL, sm = k => { k = Math.max(0, Math.min(1, k)); return k * k * (3 - 2 * k); };
+    // glide in from the lower corner, press (or push the lever over), wait so the move can be seen, then lift away and fade
+    const inK = sm(t / (U.arrive)), outK = sm((t - U.leave) / (U.gone - U.leave));
+    const sx = W * .85, sy = H * .95, x = sx + (h.x - sx) * inK, y = sy + (h.y - sy) * inK - outK * 30;
+    const pk = (t - (U.press - .25)) / .5, press = pk > 0 && pk < 1 ? Math.sin(pk * Math.PI) : 0;
+    const slide = h.slide ? sm((t - (U.press - .2)) / .5) * 32 * h.slide : 0;
+    const alpha = Math.min(1, t / .3) * (1 - outK);
+    if (h.slide && t >= U.arrive - .2 && t < U.press + .4) {                                  // a curved "push this way" arrow over the knob
+      ctx.globalAlpha = .9 * alpha; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+      const cx = h.x, cy = h.y + 30, R = 50, end = .6, tx = Math.cos(end) * h.slide, ty = Math.sin(end);
       const ex = cx + Math.sin(end) * R * h.slide, ey = cy - Math.cos(end) * R;
       ctx.beginPath(); ctx.arc(cx, cy, R, -Math.PI / 2 - end, -Math.PI / 2 + end); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(ex - tx * 11 - ty * 9 * h.slide, ey - ty * 11 + tx * 9 * h.slide); ctx.lineTo(ex + tx * 3, ey + ty * 3);
-      ctx.lineTo(ex - tx * 11 + ty * 9 * h.slide, ey - ty * 11 - tx * 9 * h.slide); ctx.stroke(); ctx.globalAlpha = 1; }
-    ctx.save(); ctx.translate(h.x + slide, h.y + 4 + press * 6); ctx.scale(1 - press * .12, 1 - press * .12);
-    ctx.font = '46px system-ui, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.lineTo(ex - tx * 11 + ty * 9 * h.slide, ey - ty * 11 - tx * 9 * h.slide); ctx.stroke(); ctx.globalAlpha = 1;
+    }
+    if (!h.slide && t >= U.arrive && t < U.press) {                                            // "tap here" ring while the hand hovers
+      const k = ((t - U.arrive) % .6) / .6; ctx.strokeStyle = `rgba(255,255,255,${(1 - k) * .8})`; ctx.lineWidth = 4; circle(h.x, h.y, 10 + k * 30); ctx.stroke();
+    }
+    ctx.save(); ctx.globalAlpha = alpha; ctx.translate(x + slide, y + 4 + press * 7); ctx.scale(1 - press * .14, 1 - press * .14);
+    ctx.font = '50px system-ui, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 8; ctx.fillText('👆', 0, -4); ctx.restore();
   }
   function drawSwitch(s, L) {
@@ -1003,7 +1031,8 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
   window.__trains = { get phase() { return phase; }, get level() { return level; },
     get theme() { return themeName; }, setTheme(name) { return setTheme(name); },
     get difficulty() { return diffName; }, setDifficulty(name) { return setDifficulty(name); }, get crash() { return D.crash; }, get speed() { return speedName; }, setSpeed(name) { return setSpeed(name); }, cfg(n) { return levelCfg(n); },
-    get hint() { const h = hintSpot(); return { on: hintOn, spot: h && { x: cv.getBoundingClientRect().left + h.x, y: cv.getBoundingClientRect().top + h.y, slide: h.slide }, caption: $('hint').classList.contains('show') ? $('hint').textContent : '' }; },
+    get hint() { const h = tut && tut.spot, r = cv.getBoundingClientRect(); return { on: hintOn, t: tut ? tut.t : null, flipped: !!(tut && tut.flipped),
+      spot: h ? { x: r.left + h.x, y: r.top + h.y, slide: h.slide } : null, caption: $('hint').classList.contains('show') ? $('hint').textContent : '' }; },
     _switch(id) { return nodes[id]; }, get route() { return activeRoute(); }, get sound() { return soundOn(); }, get soundsPlayed() { return soundsPlayed; },   // tests only: set a switch's starting position
     get controls() { return ctrlName; }, setControls(name) { return setControls(name); },
     get paused() { return paused; }, start(n) { start(Math.max(1, n | 0)); },
