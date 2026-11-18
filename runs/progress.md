@@ -12,7 +12,7 @@ Stay on scope: only Train Switcher controls this run.
 |---|---|---|---|
 | 1 | Read progress, commits and the game; write this plan | 10 min | done |
 | 2 | Settings screen: gear on start card and pause menu, three-mode picker, saved mode, "show hints again" | 25 min | done |
-| 3 | Shared switch visuals: animated points that visibly swing, active branch glow; Tap-the-rail mode with big forgiving branch targets | 30 min | |
+| 3 | Shared switch visuals: animated points that visibly swing, active branch glow; Tap-the-rail mode with big forgiving branch targets | 30 min | done |
 | 4 | Lever mode: chunky lever beside each switch, placed clear of track and stations, tap or drag to flip, link rod to the points | 30 min | |
 | 5 | First-time hints (pulsing hand + one-line caption) on level 1, per mode; first vehicle waits a moment | 20 min | |
 | 6 | Smoke test `tools/smoke-train-controls.js` (all modes, phones, hints, saving); keep existing tests passing; check screenshots | 30 min | |
@@ -25,6 +25,7 @@ Stay on scope: only Train Switcher controls this run.
 ## Log
 - 21:10 Read progress and commits. Pages branch is at 58f486b (difficulty + speed); no unfinished Train Switcher work.
 - 21:25 Settings screen done: gear on the start card and the pause card (the header button's card, now titled "Paused" during play). Mode saved as `controls` in the existing save. Checked on iPhone SE. Next: rail mode and moving points.
+- 21:40 Rail mode done: each branch owns a band 56px either side of its centre line (nearest wins; a station counts as part of its branch); the switch is a white piece of track that swings across in 0.3s; the set branch glows and the other is dimmed; a tapped branch flashes. Arrow mode keeps its arrow and buffer stops, and gains the glow and the slower visible turn. All 12 branch taps on level 4 land on the right switch. Next: lever mode.
 
 ---
 

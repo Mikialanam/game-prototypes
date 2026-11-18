@@ -229,6 +229,10 @@ const CONTROLS = {
   arrow: { emoji: '➡️', label: 'Arrow', tag: 'original', note: 'Tap the big arrow to turn it.', how: 'Tap a big arrow', hint: 'Tap the arrow to turn it' },
 };
 const DEFAULT_CONTROLS       = 'rail';
+const SWITCH_MOVE_TIME       = 0.3;  // seconds a switch takes to swing across, so you can see what your tap did (all modes)
+const RAIL_TAP_WIDTH         = 56;   // px either side of a branch's centre line that counts as tapping that branch (rail mode)
+const HUB_TAP_R              = 40;   // px: tapping the switch itself, not clearly on either branch, flips it (rail mode)
+const POINTS_LEN             = 46;   // px: length of the moving piece of track at each switch (rail and lever modes)
 const SOUND_ON               = true;
 // =====================================================
 
@@ -343,7 +347,7 @@ const SOUND_ON               = true;
       const [x, y, next] = lay[id];
       nodes[id] = { id, x, y, next: next || null, kind: id === 'e' ? 'entry' : id[0] === 's' ? 'switch' : 'station', state: 0, pulse: 0, shake: 0, ang: null };
       if (nodes[id].kind === 'station') nodes[id].colour = COLOURS[ci++];
-      if (nodes[id].kind === 'switch') { nodes[id].state = Math.random() < .5 ? 0 : 1; switches.push(nodes[id]); }
+      if (nodes[id].kind === 'switch') { const n = nodes[id]; n.state = Math.random() < .5 ? 0 : 1; n.anim = n.state; n.flash = null; switches.push(n); }
     }
     trains = []; spawned = 0; delivered = 0; spawnT = 0.6; crashAt = null; flashes = []; ripples = [];
     measure(); updateBar();
@@ -386,6 +390,13 @@ const SOUND_ON               = true;
     sw.state = 1 - sw.state; sw.pulse = 1; beep(440, .05, 'square', .06); buzz(6);
   }
 
+  // rail mode: the player tapped branch i of a switch. If it already goes that way, just say "yes, this way".
+  function setBranch(sw, i) {
+    if (phase !== 'play') return;
+    sw.flash = { i, t: 0 };
+    if (sw.state === i) { sw.pulse = .5; beep(520, .04, 'triangle', .05); buzz(4); return; }
+    flip(sw);
+  }
   function crash(x, y) {
     phase = 'fail'; crashAt = { x, y, t: 0 }; buzz([60, 40, 100]); beep(90, .5, 'sawtooth', .12);
     setTimeout(() => fail('crash'), 900);
@@ -546,7 +557,9 @@ const SOUND_ON               = true;
       }
     }
     switches && switches.forEach(s => { s.pulse = Math.max(0, s.pulse - dt * 3); s.shake = Math.max(0, s.shake - dt * 2.5);
-      const want = arrowAngle(s, s.state); s.ang = s.ang == null ? want : s.ang + (want - s.ang) * Math.min(1, dt * 20); });
+      // the switch swings across at a steady pace (drawn eased), so every move is visible
+      const step = dt / SWITCH_MOVE_TIME; s.anim = s.state > s.anim ? Math.min(s.state, s.anim + step) : Math.max(s.state, s.anim - step);
+      if (s.flash) { s.flash.t += dt; if (s.flash.t > .5) s.flash = null; } });
     nodes && Object.values(nodes).forEach(n => { if (n.kind === 'station' && n.pulse > 0) n.pulse = Math.max(0, n.pulse - dt * 2); });
     flashes && flashes.forEach(f => f.t += dt); flashes = flashes && flashes.filter(f => f.t < .6);
     ripples.forEach(p => p.t += dt); ripples = ripples.filter(p => p.t < .45);
@@ -711,6 +724,25 @@ const SOUND_ON               = true;
     },
   };
 
+  const ease = k => k * k * (3 - 2 * k);
+  const branchAngle = (s, i) => { const A = P(s.id), B = P(s.next[i]); return Math.atan2(B.y - A.y, B.x - A.x); };
+  const pointsLen = s => Math.min(POINTS_LEN * Math.max(.8, stS), ...s.next.map(m => dist(s.id, m) * .45));
+  // rail and lever modes: the switch is a moving piece of track that swings from one branch to the other
+  function drawPoints(s) {
+    const A = P(s.id), busy = occupied(s), x = A.x + (s.shake > 0 ? Math.sin(s.shake * 38) * 6 * s.shake : 0), y = A.y;
+    const len = pointsLen(s) * (1 + s.pulse * .1), ang = branchAngle(s, 0) + (branchAngle(s, 1) - branchAngle(s, 0)) * ease(s.anim);
+    if (s.pulse > 0) { ctx.strokeStyle = `rgba(255,255,255,${s.pulse * .9})`; ctx.lineWidth = 5; circle(x, y, 24 + (1 - s.pulse) * 30); ctx.stroke(); }
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+    ctx.fillStyle = 'rgba(0,0,0,.32)'; roundRect(-11, -11 + 4, len + 13, 22, 9); ctx.fill();                       // shadow
+    ctx.fillStyle = busy ? '#3b4046' : T.sw[0]; roundRect(-11, -11, len + 13, 22, 9); ctx.fill();               // the moving piece
+    ctx.strokeStyle = busy ? '#ff5d5d' : T.sw[1]; ctx.lineWidth = 3.5; ctx.stroke();
+    ctx.strokeStyle = busy ? '#8a9199' : T.sw[2]; ctx.lineWidth = 3; ctx.lineCap = 'round';                     // two rails on it
+    line(2, -5, len - 2, -5); line(2, 5, len - 2, 5);
+    ctx.fillStyle = busy ? '#8a9199' : T.sw[2]; ctx.beginPath(); ctx.moveTo(len - 1, -9); ctx.lineTo(len + 9, 0); ctx.lineTo(len - 1, 9); ctx.closePath(); ctx.fill();   // tip shows the way
+    ctx.restore();
+    ctx.fillStyle = busy ? '#ff5d5d' : T.sw[1]; circle(x, y, 10); ctx.fill(); ctx.fillStyle = '#ffffff'; circle(x, y, 4); ctx.fill();   // pivot
+    if (busy && (s.shake > 0 || Math.sin(clock * 10) > 0)) { ctx.strokeStyle = 'rgba(255,93,93,.55)'; ctx.lineWidth = 4; circle(x, y, len * .7); ctx.stroke(); }
+  }
   function drawSwitch(s, L) {
     const A = P(s.id), busy = occupied(s), r = swR * (1 + s.pulse * .12), x = A.x + (s.shake > 0 ? Math.sin(s.shake * 38) * 7 * s.shake : 0), y = A.y;
     const rimW = Math.max(5, r * .13);
@@ -722,7 +754,7 @@ const SOUND_ON               = true;
     if (!busy) L.rim(r);
     else if (s.shake > 0 || Math.sin(clock * 10) > 0) { ctx.strokeStyle = 'rgba(255,93,93,.55)'; ctx.lineWidth = 4; circle(0, 0, r + 5); ctx.stroke(); }   // blinking "not now" ring
     // the big arrow
-    ctx.rotate(s.ang == null ? arrowAngle(s, s.state) : s.ang); ctx.scale(r, r);
+    ctx.rotate(arrowAngle(s, 0) + (arrowAngle(s, 1) - arrowAngle(s, 0)) * ease(s.anim)); ctx.scale(r, r);
     ctx.beginPath(); ctx.moveTo(-.58, -.17); ctx.lineTo(.04, -.17); ctx.lineTo(.04, -.47); ctx.lineTo(.68, 0); ctx.lineTo(.04, .47); ctx.lineTo(.04, .17); ctx.lineTo(-.58, .17); ctx.closePath();
     ctx.fillStyle = ctx.strokeStyle = busy ? '#8a9199' : T.sw[2]; ctx.lineJoin = 'round'; ctx.lineWidth = .1; ctx.stroke(); ctx.fill();
     ctx.restore();
@@ -732,12 +764,19 @@ const SOUND_ON               = true;
     const L = LOOKS[T.look] || LOOKS.rails, E = [];
     for (const id in nodes) { const n = nodes[id]; if (!n.next) continue;
       n.next.forEach((m, i) => { const A = P(id), B = P(m), len = Math.hypot(B.x - A.x, B.y - A.y) || 1;
-        E.push({ A, B, L: len, ux: (B.x - A.x) / len, uy: (B.y - A.y) / len, sw: n.kind === 'switch', on: n.kind !== 'switch' || i === n.state }); }); }
+        E.push({ A, B, L: len, ux: (B.x - A.x) / len, uy: (B.y - A.y) / len, sw: n.kind === 'switch', s: n, i, on: n.kind !== 'switch' || i === n.state }); }); }
     ctx.clearRect(0, 0, W, H);
-    L.ground(); L.paths(E);
-    // each switch: the closed side is marked "off", the open side gets marching chevrons
-    E.forEach(e => { if (!e.sw) return; const g = swR + 12;
-      if (!e.on) { L.closed(e, g); return; }
+    L.ground();
+    // the branch each switch is set to glows, so the way ahead is easy to see (and flashes when tapped)
+    ctx.lineCap = 'round';
+    E.forEach(e => { if (!e.sw) return; const f = e.s.flash && e.s.flash.i === e.i ? 1 - e.s.flash.t / .5 : 0;
+      if (!e.on && !f) return;
+      ctx.strokeStyle = `rgba(255,255,255,${(e.on ? .2 + .08 * Math.sin(clock * 4) : 0) + f * .35})`; ctx.lineWidth = 54; line(e.A.x, e.A.y, e.B.x, e.B.y); });
+    L.paths(E);
+    // each switch: the closed side is marked "off" (arrow mode) or dimmed (rail and lever modes); the open side gets marching chevrons
+    const arrows = ctrlName === 'arrow';
+    E.forEach(e => { if (!e.sw) return; const g = arrows ? swR + 12 : pointsLen(e.s) + 14;
+      if (!e.on) { if (arrows) L.closed(e, g); else { const a = along(e, g - 4), b = along(e, e.L - 4); ctx.lineCap = 'butt'; ctx.strokeStyle = 'rgba(4,10,12,.5)'; ctx.lineWidth = 30; line(a.x, a.y, b.x, b.y); } return; }
       ctx.lineCap = 'round'; ctx.lineJoin = 'round';
       for (let i = 0; i < 3; i++) { const s = g + 6 + i * 15; if (s > e.L - 40) break; const p = along(e, s), a = .35 + .65 * (.5 + .5 * Math.sin(clock * 7 - i * 1.4));
         ctx.beginPath(); ctx.moveTo(p.x - e.ux * 6 - e.uy * 8, p.y - e.uy * 6 + e.ux * 8); ctx.lineTo(p.x, p.y); ctx.lineTo(p.x - e.ux * 6 + e.uy * 8, p.y - e.uy * 6 - e.ux * 8);
@@ -747,7 +786,7 @@ const SOUND_ON               = true;
       const p = P(id), s = (1 + Math.max(0, n.pulse) * .25) * stS; L.home(n, p, s);
       if (n.pulse < 0) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 5; ctx.lineCap = 'round'; line(p.x - 14, p.y - 6, p.x + 14, p.y + 22); line(p.x + 14, p.y - 6, p.x - 14, p.y + 22); }
     }
-    switches.forEach(s => drawSwitch(s, L));
+    switches.forEach(s => ctrlName === 'arrow' ? drawSwitch(s, L) : drawPoints(s));
     flashes.forEach(f => { ctx.strokeStyle = `rgba(255,255,255,${1 - f.t / .6})`; ctx.lineWidth = 4; circle(f.x, f.y + 8, 30 + f.t * 90); ctx.stroke(); });
     // vehicles go on top of the switch buttons, so they are never hidden
     trains.forEach(t => L.vehicle(t));
@@ -757,15 +796,35 @@ const SOUND_ON               = true;
   }
 
   // ---------- input ----------
-  // A tap anywhere near a switch flips it: the nearest switch within the tap reach wins.
-  $('stage').addEventListener('pointerdown', e => {
-    e.preventDefault(); if (phase !== 'play' || paused) return;
-    const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  // Rail mode: which branch a tap is on. Every branch owns a wide band (RAIL_TAP_WIDTH each side) from just below its switch to
+  // its end (a station counts as part of its branch); the nearest band wins. A tap on the switch itself, on no band, flips it.
+  function railHit(x, y) {
+    let best = null, bd = RAIL_TAP_WIDTH;
+    switches.forEach(s => s.next.forEach((m, i) => {
+      const A = P(s.id), B = P(m), len = Math.hypot(B.x - A.x, B.y - A.y) || 1, ux = (B.x - A.x) / len, uy = (B.y - A.y) / len;
+      const a = (x - A.x) * ux + (y - A.y) * uy, d = Math.abs((x - A.x) * uy - (y - A.y) * ux);
+      const end = nodes[m].kind === 'switch' ? len - HUB_TAP_R : len + 36;
+      if (a >= 12 && a <= end && d <= bd) { bd = d; best = { s, i }; }
+    }));
+    if (best) return best;
+    switches.forEach(s => { const p = P(s.id); if (Math.hypot(p.x - x, p.y - y) <= HUB_TAP_R && !best) best = { s, i: 1 - s.state }; });
+    return best;
+  }
+  // Arrow mode: a tap anywhere near a switch flips it: the nearest switch within the tap reach wins.
+  function arrowHit(x, y) {
     let best = null, bd = tapR;
     switches.forEach(s => { const p = P(s.id), d = Math.hypot(p.x - x, p.y - y); if (d <= bd) { bd = d; best = s; } });
-    ripples.push({ x, y, t: 0, hit: !!best });
-    if (best) flip(best);
+    return best;
+  }
+  const stageXY = e => { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+  $('stage').addEventListener('pointerdown', e => {
+    e.preventDefault(); if (phase !== 'play' || paused) return;
+    const { x, y } = stageXY(e);
+    if (ctrlName === 'rail') { const h = railHit(x, y); ripples.push({ x, y, t: 0, hit: !!h }); if (h) setBranch(h.s, h.i); return; }
+    if (ctrlName === 'lever') { leverDown(e, x, y); return; }
+    const best = arrowHit(x, y); ripples.push({ x, y, t: 0, hit: !!best }); if (best) flip(best);
   });
+  function leverDown() {}   // filled in with lever mode
   $('startBtn').addEventListener('click', () => start(1));
   $('nextBtn').addEventListener('click', () => start(level + 1));
   $('retryBtn').addEventListener('click', () => start(level));
@@ -786,7 +845,9 @@ const SOUND_ON               = true;
     },
     snapshot() {
       const stage = cv.getBoundingClientRect();
-      return { switches: switches.map(s => ({ id: s.id, state: s.state, busy: occupied(s), x: stage.left + P(s.id).x, y: stage.top + P(s.id).y })),
+      return { switches: switches.map(s => ({ id: s.id, state: s.state, busy: occupied(s), x: stage.left + P(s.id).x, y: stage.top + P(s.id).y, anim: s.anim,
+          // rail mode: where each branch's track is (switch and far end, page px), for tests that tap along it
+          branches: s.next.map(m => ({ to: m, ax: stage.left + P(s.id).x, ay: stage.top + P(s.id).y, bx: stage.left + P(m).x, by: stage.top + P(m).y })) })),
         trains: trains.map(t => ({ colour: t.colour, at: t.route[t.route.length - 1], d: t.cum[t.cum.length - 1] - t.d })),
         // which branch each switch must point to for each colour
         routes: Object.fromEntries(switches.map(s => [s.id, Object.fromEntries(COLOURS.map(c => {
