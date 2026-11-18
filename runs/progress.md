@@ -21,8 +21,8 @@ Working branch: `claude/awesome-sagan-qgefe9`, kept rebased on the GitHub Pages 
 |---|---|---|---|
 | 1 | Write this file; verify and commit Math Ring | 20 min | done |
 | 2 | Train Switcher: finish arrows, tap zone, themes; smoke test on phones; review; commit | 30 min | done |
-| 3 | City Builder spec from the two finished designs → `docs/city-builder-spec.md` | 25 min | next |
-| 4 | City Builder v1, part 1: map, merging, renting, flags, settings screen | 30 min | |
+| 3 | City Builder spec from the two finished designs → `docs/city-builder-spec.md` | 25 min | done |
+| 4 | City Builder v1, part 1: map, merging, renting, flags, settings screen | 30 min | next |
 | 5 | City Builder v1, part 2: tenants, deals, jobs and skills, away | 30 min | |
 | 6 | City Builder smoke test on phones (all-on, all-off, mixed flags); fix layout | 30 min | |
 | 7 | Home page "New", RATING-SHEET.md, RUN-LOG.md, README; final report | 20 min | |
@@ -34,3 +34,4 @@ Working branch: `claude/awesome-sagan-qgefe9`, kept rebased on the GitHub Pages 
 ## Log
 - 03:30 Resumed. Math Ring smoke tests re-run: `smoke-test-2.js math-ring` and `smoke-math-ring.js` both pass, screenshots at 360x640 checked.
 - 03:55 Train Switcher committed. New `smoke-train-switcher.js` passes (68 checks, all three themes, 3 phone sizes). The old `smoke-test-2.js train-switcher` bot is flaky at level 4 on the *original* game too (its 40ms polling bot sometimes misroutes); it passed 2 of 2 runs on the new version. Screenshots at 360x640 checked for trains, boats and planes.
+- 03:50 City Builder spec written (`docs/city-builder-spec.md`), from the puzzle-first and landlord-economy designs; the map-first design and the synthesis never ran.
