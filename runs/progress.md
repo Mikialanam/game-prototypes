@@ -15,7 +15,7 @@ Stay on scope: only the three City Hall games this run.
 | 3 | Contract Hustle: 10 bid rounds, influence moves, computer mayor reacts to opinion; quick phone check; README | 30 min | done |
 | 4 | Street Clash: pick protester or police, 60s levels, slapstick only, opinion meter; quick phone check; README | 30 min | done |
 | 5 | Smoke test all three on emulated phones (`tools/smoke-city-hall.js`), check screenshots, fix layout | 30 min | done |
-| 6 | Home page "New", RATING-SHEET.md rows, RUN-LOG.md note; final report | 20 min | next |
+| 6 | Home page "New", RATING-SHEET.md rows, RUN-LOG.md note; final report | 20 min | done |
 
 Shared rules for all three: made-up city (Port Halden) and parties, even-handed satire, single player, phone portrait, Public Opinion meter 0–100, ~5-minute term, daily crisis seeded by date, credits with buy/ad placeholders that never win outright, tunable constants, `SOUND_ON`, best score in localStorage.
 
@@ -30,6 +30,20 @@ Shared rules for all three: made-up city (Port Halden) and parties, even-handed 
 - 06:27 Contract Hustle done and pushed. First bot check showed passing every round beat bidding and fair/premium bids never won; retuned (cheaper builds, stronger connections weight, private jobs 12→5). Now: smart bidder 375, lobbyist 360 but risky (205–464, usually frozen out), always-pass 290. Odds text on bid buttons made readable.
 - 06:35 Street Clash done and pushed. Bot runs at 360x640: protester bot clears level 1 with 4–8 people; police first counted any fast touch as a tackle, so even a careful bot sank opinion to 4. Now only running *into* someone tackles; a gentle bot ends level 1 at opinion 91. Recruit range up, boosts cheaper.
 - 06:45 `tools/smoke-city-hall.js` added: plays all three games end to end on 320x568, 360x640, 390x844 and 412x915; checks buttons on screen and ≥44px, no sideways scroll, daily crisis, tricks, ad placeholder, frozen-out mayor, real finger drag, level 2, best scores saved, no console errors, and that a heavy-handed police bot ends with lower opinion than a gentle one (gentle ~65, rough 0–7). 428/428 pass. Screenshots checked at 320 and 360; only fix needed was a smaller header on 320px phones in Mayor's Desk.
+- 06:50 Home page lists the three under "New · City Hall Game (Faizan × Miki)"; README table, RATING-SHEET.md rows plus meeting questions, RUN-LOG.md row. Pushed to Pages.
+
+## Handover (City Hall run)
+**Done:** Mayor's Desk, Contract Hustle, Street Clash, each with a README; `tools/smoke-city-hall.js` (428/428 on four phone sizes); home page, rating sheet, run log. All on `claude/laughing-cray-tbzkbv` and the Pages branch `claude/intelligent-lamport-sbfavc`.
+
+**Blocked:** none.
+
+**Choices Faizan and Miki may want to change (all are constants or plain lists at the top of each script):**
+- Mayor's Desk: win line 50 opinion; leftover credits only count if you win (stops a reject-everything exploit); three rival rallies; tricks once each per term with 25–40% exposure risk.
+- Contract Hustle: opinion of your firm (not of the mayor) is the meter; mayor shows one contract under 35, freezes you out under 20; score is company value with reputation ×2 and connections ×1.
+- Street Clash: police tackles only count when you run *into* someone; escorts are the gentle path; being bonked as a protester raises opinion (sympathy); opinion multiplies score.
+- Money: ads give small one-off credits; "Buy credits" does nothing on purpose.
+
+**Next (later):** play-test numbers with real people (all balance is from bots); more roles in the same city; multiplayer; shared save across the three games.
 
 ---
 

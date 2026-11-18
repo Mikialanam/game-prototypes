@@ -13,6 +13,10 @@ Play each game for about 5 minutes on your phone, ideally first thing, before re
 | Merge a City | | | | | | | |
 | Property Tycoon (idle) | | | | | | | |
 | City Builder (merge + landlord) | | | | | | | |
+| Mayor's Desk (City Hall 1) | | | | | | | |
+| Contract Hustle (City Hall 2) | | | | | | | |
+| Street Clash: protester (City Hall 3) | | | | | | | |
+| Street Clash: police (City Hall 3) | | | | | | | |
 
 **What the columns mean**
 - **Fun:** did you enjoy it while playing?
@@ -31,6 +35,18 @@ Play each game for about 5 minutes on your phone, ideally first thing, before re
 | Without tenants | | |
 | Without deals | | |
 | Without jobs and skills | | |
+
+**City Hall Game: questions for Faizan and Miki's meeting.** Play all three before you meet.
+
+| Question | Faizan | Miki |
+|---|---|---|
+| Which of the three should be the core game? | | |
+| Mayor's Desk: did the dirty tricks feel worth the risk? | | |
+| Contract Hustle: did the mayor freezing you out feel fair? | | |
+| Street Clash: more fun as protester or police? | | |
+| Did either side feel like "the good guys"? (It shouldn't.) | | |
+| Would you pay for credits, or watch an ad, in any of them? Where? | | |
+| Which role should come next (protester leader, police chief, campaign funder)? | | |
 
 **Re-rate after this run's changes:** Train Switcher (bigger arrows, themes: did a child manage it?) and Math Ring (does it get hard fast enough?).
 
