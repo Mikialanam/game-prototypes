@@ -19,11 +19,15 @@ const PHONES = {
   const summary = { themes: {}, phones: {}, tapZone: {}, busyFlip: {}, pause: {} };
   const check = (name, ok, detail) => { if (ok) passed++; else failed.push(detail === undefined ? name : `${name} (${JSON.stringify(detail)})`); return ok; };
 
+  let openCount = 0;
   async function open(phone, file = FILE) {
     const ctx = await browser.newContext(PHONES[phone]); const page = await ctx.newPage();
     page.on('pageerror', e => errs.push(`${phone}: pageerror: ${e.message}`));
     page.on('console', m => { if (m.type() === 'error') errs.push(`${phone}: console: ${m.text()}`); });
-    await page.goto('file://' + file);
+    // each test browser gets its own made-up web address, so saved data (best levels, theme) can't leak between tests running side by side
+    const host = `http://tsw-test-${++openCount}.local/`;
+    await ctx.route(host + '**', route => route.fulfill({ path: file, contentType: 'text/html; charset=utf-8' }));
+    await page.goto(host + 'train-switcher.html');
     return { page, ctx };
   }
   const snap = page => page.evaluate(() => __trains.snapshot());
