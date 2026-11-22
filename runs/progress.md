@@ -18,7 +18,6 @@ Stay on scope: only this Train Switcher change.
 
 ## Later (not this run)
 - Playtest with the same child (table in RATING-SHEET.md).
-- Publish to the Pages branch once Miki says so.
 
 ## Log
 - Brought the session branch up to the latest Train Switcher work (fast-forward to 96a2f37). Baseline: `smoke-train-switcher.js` 72/72, `smoke-train-controls.js` 90/91 (one lever-tap check on iPhone 13 failed before any change; run in parallel with the other test).
@@ -28,7 +27,7 @@ Stay on scope: only this Train Switcher change.
 ## Handover (Kid waits)
 **Done:** On 🧸 Kid, vehicles stop before every switch and wait with no time limit; the waiting switch glows and shows two big pulsing arrows plus a caption; tapping an arrow (or the mode's own control on the side you want) sets the switch and lets the vehicle go. Adult, Expert and the Slow / Normal / Fast speeds are unchanged. All on `claude/serene-brahmagupta-k4uwiz`.
 
-**Not done:** not published to the Pages branch `claude/intelligent-lamport-sbfavc` (needs Miki's go-ahead).
+**Published:** Miki said "make it live"; the Pages branch `claude/intelligent-lamport-sbfavc` was fast-forwarded to 5dcee05. Checked on the live link in a browser: Kid start-card rule shows, the train waits at the switch with the arrows and caption, and goes after an arrow tap; no page errors.
 
 **Choices to revisit after a playtest:** a wrong pick still ends the level (Kid still has to match colours); in Arrow and Lever modes a tap on the waiting switch picks the side tapped rather than flipping it; only the front waiting vehicle gets the arrows; the caption sits at the top and can cover the end of the queue on small phones (`WAIT_CAPTION = ''` turns it off).
 
