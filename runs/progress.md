@@ -1,5 +1,32 @@
 # Run progress
 
+Run started 2026-11-22. Brief: **Train Switcher, Kid mode waits at switches.** In Kid difficulty, a vehicle stops just before each switch and waits until the player picks a direction (tap/click on that switch, in whatever control mode). No timer, no pressure. The waiting switch is made obvious (glow / pulsing arrow). Adult and Expert, and the Slow / Normal / Fast speeds, behave as before.
+
+Working branch: session branch `claude/serene-brahmagupta-k4uwiz` (fast-forwarded to the Pages branch's latest, 96a2f37). Not pushed to the Pages branch without Miki's go-ahead.
+
+Stay on scope: only this Train Switcher change.
+
+## Plan (this run)
+
+| # | Step | Estimate | Status |
+|---|---|---|---|
+| 1 | Read progress, commits and the game; write this plan | 10 min | done |
+| 2 | Kid mode: vehicle stops before each switch, waits for a tap on that switch, then moves on; vehicles behind queue up; no fail from waiting | 30 min | |
+| 3 | Make the waiting switch obvious: pulsing glow ring + bouncing arrow, caption "Tap the switch!" | 20 min | |
+| 4 | Tests: new checks in a smoke test (Kid waits, tap releases, Adult/Expert unchanged); rerun existing Train Switcher tests; screenshots | 30 min | |
+| 5 | README, handover | 10 min | |
+
+## Later (not this run)
+- Playtest with the same child (table in RATING-SHEET.md).
+- Publish to the Pages branch once Miki says so.
+
+## Log
+- Brought the session branch up to the latest Train Switcher work (fast-forward to 96a2f37).
+
+---
+
+# Previous run: Train Switcher round 2
+
 Run started 2026-11-18 23:05 UTC. Brief: **Train Switcher, round 2 of the controls brief** (kindergarten playtester, toy-train handle). Most of it shipped in the previous run (Settings, three modes, saved choice, moving track, hints). Still missing from this brief: a **click sound with a mute toggle in Settings**, a **very easy first level** (one switch, slow train, two stations, whatever the difficulty), a **highlight of the whole active route**, and a tutorial hand that **shows one flip itself, then disappears**.
 
 Working branch: the GitHub Pages branch `claude/intelligent-lamport-sbfavc` (session branch `claude/admiring-ramanujan-f60m4i` kept in step). Live: https://mikialanam.github.io/game-prototypes/games/train-switcher/train-switcher.html
