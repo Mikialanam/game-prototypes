@@ -48,6 +48,13 @@ const PHONES = {
     if (mode === 'lever') return page.touchscreen.tap(s.lever.x, s.lever.y);
     return page.touchscreen.tap(s.x, s.y);
   }
+  // Kid mode, a vehicle waiting at s: pick branch i with the mode's own control, tapping on that side (rail: the track itself)
+  async function pick(page, mode, s, i) {
+    const side = Math.sign(s.branches[i].bx - s.branches[1 - i].bx);
+    if (mode === 'rail') { const p = at(s.branches[i], .6); return page.touchscreen.tap(p.x, p.y); }
+    if (mode === 'lever') return page.touchscreen.tap(s.lever.x + side * s.lever.r * .6, s.lever.y);
+    return page.touchscreen.tap(s.x + side * s.r * .55, s.y - s.r * .3);
+  }
   // a bot that plays with the mode's own taps: point each switch at the branch the next approaching vehicle needs
   async function playLevel(page, mode) {
     const t0 = Date.now();
@@ -57,7 +64,8 @@ const PHONES = {
       for (const w of s.switches) {
         const next = s.trains.filter(t => t.at === w.id).sort((a, b) => a.d - b.d)[0]; if (!next) continue;
         const want = s.routes[w.id][next.colour];
-        if (want !== w.state && !w.busy) { await move(page, mode, w, want); await page.waitForTimeout(30); }
+        if (s.waitMode) { if (w.wait && !w.busy) { await pick(page, mode, w, want); await page.waitForTimeout(30); } }   // Kid: answer the waiting vehicle
+        else if (want !== w.state && !w.busy) { await move(page, mode, w, want); await page.waitForTimeout(30); }
       }
       await page.waitForTimeout(40);
     }

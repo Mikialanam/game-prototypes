@@ -11,8 +11,8 @@ Stay on scope: only this Train Switcher change.
 | # | Step | Estimate | Status |
 |---|---|---|---|
 | 1 | Read progress, commits and the game; write this plan | 10 min | done |
-| 2 | Kid mode: vehicle stops before each switch, waits for a tap on that switch, then moves on; vehicles behind queue up; no fail from waiting | 30 min | |
-| 3 | Make the waiting switch obvious: pulsing glow ring + bouncing arrow, caption "Tap the switch!" | 20 min | |
+| 2 | Kid mode: vehicle stops before each switch, waits for a tap on that switch, then moves on; vehicles behind queue up; no fail from waiting | 30 min | done |
+| 3 | Make the waiting switch obvious: pulsing glow ring + bouncing arrow, caption "Tap the switch!" | 20 min | done |
 | 4 | Tests: new checks in a smoke test (Kid waits, tap releases, Adult/Expert unchanged); rerun existing Train Switcher tests; screenshots | 30 min | |
 | 5 | README, handover | 10 min | |
 
@@ -21,7 +21,8 @@ Stay on scope: only this Train Switcher change.
 - Publish to the Pages branch once Miki says so.
 
 ## Log
-- Brought the session branch up to the latest Train Switcher work (fast-forward to 96a2f37).
+- Brought the session branch up to the latest Train Switcher work (fast-forward to 96a2f37). Baseline: `smoke-train-switcher.js` 72/72, `smoke-train-controls.js` 90/91 (one lever-tap check on iPhone 13 failed before any change; run in parallel with the other test).
+- Kid waits done: `wait: true` on Kid in `DIFFICULTIES`. A vehicle stops in front of each switch and waits with no limit; vehicles behind queue a train-length apart and new ones only enter when the entry is clear. The waiting switch gets a warm pulsing glow with a ripple ring, two big pulsing arrows (gold = way it's set now) fanned out left and right, a soft ping, and the caption "Which way? Tap an arrow". Tapping an arrow, the track (rail), the side of the lever, or the side of the arrow button picks that way and the vehicle goes. Start card in Kid says vehicles wait. Adult/Expert untouched. New `tools/smoke-train-wait.js` 47/47; old bots taught to answer waiting vehicles. Next: run the existing tests.
 
 ---
 

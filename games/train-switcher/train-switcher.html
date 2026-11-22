@@ -110,6 +110,7 @@
     <div class="dpicker spicker"></div>
     <p class="rule"><b id="howTo">Tap a big arrow</b> to send each <span data-w="one">train</span> to the <span data-w="place">station</span> of <b>its colour</b>.</p>
     <p class="rule" id="ruleCrash">Don't move a switch while a <span data-w="one">train</span> is <b style="color:var(--bad)">on it</b>, <span data-w="oops">or it crashes</span>.</p>
+    <p class="rule" id="ruleWait" hidden>Each <span data-w="one">train</span> <b>stops at a switch and waits</b> for you. Tap the way it should go.</p>
     <p class="rule" id="ruleSafe" hidden>A switch won't move while a <span data-w="one">train</span> is <b style="color:var(--bad)">on it</b>. Wait for it to pass.</p>
     <button class="btn" id="startBtn">Start</button>
   </div>
@@ -193,11 +194,20 @@ const TAP_RADIUS             = 100;  // px: a tap this close to a switch flips i
 // Difficulty: the same levels underneath, scaled. Each difficulty keeps its own best level.
 //   speed, gap: multiply every level's speed and the time between vehicles.   trains: added to every level's count (never below MIN_TRAINS).
 //   crash: true = tapping a switch with a vehicle on it crashes; false = the switch only shakes and stays put.
+//   wait: true = every vehicle stops just before each switch and waits, with no time limit, until the player picks a way (see WAIT_*).
 const DIFFICULTIES = {
-  kid:    { emoji: '🧸', label: 'Kid',    speed: 0.60, gap: 1.60, trains: -2, crash: false },
-  adult:  { emoji: '🙂', label: 'Adult',  speed: 0.80, gap: 1.25, trains: -1, crash: false },
-  expert: { emoji: '🔥', label: 'Expert', speed: 1.10, gap: 0.90, trains: 0,  crash: true },
+  kid:    { emoji: '🧸', label: 'Kid',    speed: 0.60, gap: 1.60, trains: -2, crash: false, wait: true },
+  adult:  { emoji: '🙂', label: 'Adult',  speed: 0.80, gap: 1.25, trains: -1, crash: false, wait: false },
+  expert: { emoji: '🔥', label: 'Expert', speed: 1.10, gap: 0.90, trains: 0,  crash: true,  wait: false },
 };
+// Waiting at switches (difficulties with wait: true, i.e. Kid). The vehicle stops in front of the switch; the switch glows and two big
+// pulsing arrows appear on its branches. Tapping an arrow (or the track, the switch or the lever on the side you want) sets the switch
+// that way and the vehicle moves on. Vehicles behind queue up; new ones only come in when the entry is clear.
+const WAIT_STOP              = 10;   // px kept between the edge of the switch (button or pivot) and the front of the waiting vehicle
+const WAIT_NEAR              = 70;   // px: a vehicle this close to its stopping point already counts as waiting (the arrows appear as it rolls in)
+const FOLLOW_GAP             = 18;   // px kept between a queued vehicle and the one in front of it
+const WAIT_ARROW_R           = 27;   // px: radius of each "go this way" arrow bubble (scaled down a little on narrow phones)
+const WAIT_CAPTION           = 'Which way? Tap an arrow';   // shown at the top while a vehicle waits (empty = no caption)
 // Speed: works on top of any difficulty and can be changed at any time, even mid-level. speed multiplies how fast vehicles move;
 // the time between them stretches to match, so they stay the same distance apart on the track.
 const SPEEDS = {
@@ -320,6 +330,7 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
   let phase = 'menu', level = 1, cfg, nodes, switches, trains, spawned, delivered, spawnT, last, crashAt, flashes;
   let hintOn = false, firstColour = null, tut = null;                    // first-time tutorial (level 1 only): tut = { t, spot, flipped }
   let gesture = null;                                                    // a finger held on a lever (lever mode)
+  let promptSw = null, promptT = 0;                                       // Kid mode: the switch whose arrows are showing, and for how long
   let paused = false, clock = 0, ripples = [], decor = [], card = null;  // card: what the win / fail card is showing
   let swR = 40, tapR = TAP_RADIUS, stS = 1;                              // switch radius, tap reach, station scale: worked out from the screen
   // best levels are kept per difficulty; a best from before difficulties existed counts as Adult
@@ -428,7 +439,7 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
     let target = nodes[stationIds[Math.floor(Math.random() * stationIds.length)]];
     if (spawned === 0 && firstColour) target = Object.values(nodes).find(n => n.kind === 'station' && n.colour === firstColour) || target;
     const first = nodes.e.next[0];
-    trains.push({ colour: target.colour, route: ['e', first], cum: [0, dist('e', first)], d: 0 });
+    trains.push({ colour: target.colour, route: ['e', first], cum: [0, dist('e', first)], d: 0, go: {} });   // go: switches the player has let it through (Kid)
     spawned++;
   }
 
@@ -447,7 +458,7 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
 
   const hintSeen = () => !!(load().hints || {})[ctrlName];
   function start(n) {
-    level = n; buildLevel(); phase = 'play'; paused = false; card = null; gesture = null;
+    level = n; buildLevel(); phase = 'play'; paused = false; card = null; gesture = null; promptSw = null;
     hintOn = level === 1 && !hintSeen(); firstColour = null; tut = hintOn ? { t: -TUTORIAL.start } : null;
     if (hintOn) {   // the first vehicle waits a moment, and the first switch starts the wrong way for it, so the hint shows a move that matters
       const st = Object.values(nodes).filter(k => k.kind === 'station'), target = st[Math.floor(Math.random() * st.length)], s1 = nodes[nodes.e.next[0]];
@@ -462,16 +473,53 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
     if (occupied(sw)) {
       if (D.crash) { const p = P(sw.id); crash(p.x, p.y); }
       else { sw.shake = 1; beep(130, .14, 'square', .07); buzz([25, 30, 25]); }   // gentle rule: it shakes, says no, and stays put
-      return;
+      return false;
     }
     sw.state = 1 - sw.state; sw.pulse = 1; clack(); buzz(6);
+    if (!demo) release(sw);
+    return true;
+  }
+  // ---------- waiting at switches (Kid) ----------
+  // how far before a switch's centre a waiting vehicle's front stops: clear of the switch zone and of the arrow button
+  const waitStop = () => Math.max(SWITCH_ZONE + 8, swR + WAIT_STOP);
+  // the vehicle waiting at (or rolling up to) switch s for the player's pick, or null. Only the frontmost one counts.
+  function waiter(s) {
+    if (!D.wait || phase !== 'play') return null;
+    let best = null;
+    trains.forEach(t => { if (t.route[t.route.length - 1] !== s.id || t.go[s.id]) return;
+      const left = t.cum[t.cum.length - 1] - waitStop() - t.d; if (left <= WAIT_NEAR && (!best || t.d > best.d)) best = t; });
+    return best;
+  }
+  // the switch whose arrows are showing: the waiting vehicle furthest ahead in the queue, at a switch that is free to move
+  function waitPrompt() {
+    if (!D.wait || phase !== 'play') return null;
+    for (const t of trains) { const s = nodes[t.route[t.route.length - 1]]; if (s.kind === 'switch' && waiter(s) === t && !occupied(s)) return s; }
+    return null;
+  }
+  // the player picked a way at switch s: the vehicle waiting there moves on
+  function release(s) { const t = waiter(s); if (t) { t.go[s.id] = true; if (s === promptSw) promptSw = null; } }
+  // which branch of s is on the side of x (left or right of cx); right on the middle keeps the way it is set
+  const sideOf = (s, x, cx) => Math.abs(x - cx) < 6 ? s.state : (x < cx) === (leftIdx(s) === 0) ? 0 : 1;
+  const waitArrowR = () => WAIT_ARROW_R * Math.max(.85, stS);
+  // where the "go this way" arrow for branch i of s sits: just past the switch, leaning out to its side (at least ARROW_MIN_TILT)
+  // so the two choices are well apart and clearly point left and right
+  function waitArrowAt(s, i) {
+    const A = P(s.id), B = P(s.next[i]), R = waitArrowR(), len = Math.hypot(B.x - A.x, B.y - A.y) || 1, edge = ctrlName === 'arrow' ? swR : pointsLen(s) + 6;
+    const d = Math.min(len * .5, edge + R + 14), ang = arrowAngle(s, i);
+    return { x: Math.max(R + 4, Math.min(W - R - 4, A.x + Math.cos(ang) * d)), y: A.y + Math.sin(ang) * d, ang };
+  }
+  function waitArrowHit(x, y) {
+    let best = null, bd = waitArrowR() + 8;
+    switches.forEach(s => { if (!waiter(s)) return; [0, 1].forEach(i => { const p = waitArrowAt(s, i), d = Math.hypot(p.x - x, p.y - y); if (d <= bd) { bd = d; best = { s, i }; } }); });
+    return best;
   }
 
   // rail mode: the player tapped branch i of a switch. If it already goes that way, just say "yes, this way".
+  // Kid mode: also how the player picks a way for a waiting vehicle (any mode); the vehicle moves on once the switch is set.
   function setBranch(sw, i) {
     if (phase !== 'play') return;
     sw.flash = { i, t: 0 };
-    if (sw.state === i) { sw.pulse = .5; beep(520, .04, 'triangle', .05); buzz(4); return; }
+    if (sw.state === i) { sw.pulse = .5; beep(520, .04, 'triangle', .05); buzz(4); if (!occupied(sw)) release(sw); return; }
     flip(sw);
   }
   function crash(x, y) {
@@ -544,7 +592,7 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
     diffName = name; D = DIFFICULTIES[name];
     if (remember) { const s = load(); s.difficulty = name; save(s); }
     document.querySelectorAll('.dpicker .pick').forEach(b => { const on = b.dataset.diff === name; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
-    $('ruleCrash').hidden = !D.crash; $('ruleSafe').hidden = D.crash;
+    $('ruleCrash').hidden = !D.crash; $('ruleSafe').hidden = D.crash || !!D.wait; $('ruleWait').hidden = !D.wait;
     if (changed && paused && phase === 'play') { diffChangedInPlay = true; $('themeDone').textContent = 'Start again at level 1'; }
     updatePill(); if (cfg && phase !== 'play') { cfg = levelCfg(level); renderCard(); }
     return true;
@@ -623,9 +671,17 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
     if (phase === 'play' && !paused) {
       tutorialStep(dt);
       spawnT -= dt;
-      if (spawned < cfg.trains && spawnT <= 0) { spawn(); spawnT = cfg.gap; }
+      // Kid mode: a new vehicle only comes in once the one before it has moved clear of the entry
+      const entryClear = !D.wait || !trains.length || trains[trains.length - 1].d >= trainLen() + FOLLOW_GAP;
+      if (spawned < cfg.trains && spawnT <= 0 && entryClear) { spawn(); spawnT = cfg.gap; }
       for (const t of [...trains]) {
-        t.d += cfg.speed * H * dt;
+        const before = t.d; t.d += cfg.speed * H * dt;
+        if (D.wait) {   // Kid mode: stop in front of a switch until the player picks a way, and queue behind the vehicle in front
+          for (const o of trains) { if (o === t) break; if (t.route.every((id, i) => o.route[i] === id)) t.d = Math.min(t.d, o.d - trainLen() - FOLLOW_GAP); }
+          const end = nodes[t.route[t.route.length - 1]];
+          if (end.kind === 'switch' && !t.go[end.id]) t.d = Math.min(t.d, t.cum[t.cum.length - 1] - waitStop());
+          t.d = Math.max(before, t.d);
+        }
         while (phase === 'play' && t.d >= t.cum[t.cum.length - 1]) {
           const n = nodes[t.route[t.route.length - 1]];
           if (n.kind === 'station') {
@@ -641,6 +697,7 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
         }
       }
     }
+    if (nodes) { const w = phase === 'play' ? waitPrompt() : null; if (w !== promptSw) { promptSw = w; promptT = 0; if (w) beep(880, .06, 'sine', .05); } else promptT += dt; }
     switches && switches.forEach(s => { s.pulse = Math.max(0, s.pulse - dt * 3); s.shake = Math.max(0, s.shake - dt * 2.5);
       // the switch swings across at a steady pace (drawn eased), so every move is visible
       const step = dt / SWITCH_MOVE_TIME; s.anim = s.state > s.anim ? Math.min(s.state, s.anim + step) : Math.max(s.state, s.anim - step);
@@ -881,7 +938,9 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
   }
   function drawHint() {
     const cap = $('hint'), h = tut && tut.spot, t = tut ? tut.t : -1, on = !!h && t < TUTORIAL.leave + .3;
-    cap.classList.toggle('show', on);
+    const waitCap = !on && promptSw && WAIT_CAPTION ? WAIT_CAPTION.replace('{one}', T.one) : '';   // Kid mode: a vehicle is waiting for a pick
+    cap.classList.toggle('show', on || !!waitCap);
+    if (waitCap && cap.textContent !== waitCap) cap.textContent = waitCap;
     if (!h || t < 0) return;
     const txt = C.hint.replace('{one}', T.one); if (cap.textContent !== txt) cap.textContent = txt;
     const U = TUTORIAL, sm = k => { k = Math.max(0, Math.min(1, k)); return k * k * (3 - 2 * k); };
@@ -905,6 +964,26 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
     ctx.save(); ctx.globalAlpha = alpha; ctx.translate(x + slide, y + 4 + press * 7); ctx.scale(1 - press * .14, 1 - press * .14);
     ctx.font = '50px system-ui, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 8; ctx.fillText('👆', 0, -4); ctx.restore();
+  }
+  // Kid mode: the switch a vehicle is waiting at. Under the switch: a warm pulsing glow and a ring that keeps rippling outwards.
+  function drawWaitGlow(s) {
+    const A = P(s.id), r = (ctrlName === 'arrow' ? swR : pointsLen(s) * .6) + 10, k = .5 + .5 * Math.sin(clock * 5), pop = Math.min(1, promptT / .35);
+    const g = ctx.createRadialGradient(A.x, A.y, r * .4, A.x, A.y, r + 34);
+    g.addColorStop(0, `rgba(255,204,51,${(.55 + .25 * k) * pop})`); g.addColorStop(1, 'rgba(255,204,51,0)'); ctx.fillStyle = g; circle(A.x, A.y, r + 34); ctx.fill();
+    const w = (clock * .9) % 1; ctx.strokeStyle = `rgba(255,204,51,${(1 - w) * .9 * pop})`; ctx.lineWidth = 5; circle(A.x, A.y, r + w * 36); ctx.stroke();
+  }
+  // ...and on top: a big round arrow on each branch, gently pulsing and nudging the way it points. The way the switch is set now is gold.
+  function drawWaitArrows(s) {
+    const R = waitArrowR(), pop = ease(Math.min(1, promptT / .35));
+    [0, 1].forEach(i => { const p = waitArrowAt(s, i), set = i === s.state, k = Math.sin(clock * 6 + i * Math.PI);
+      ctx.save(); ctx.translate(p.x, p.y); ctx.scale(pop * (1 + .07 * k), pop * (1 + .07 * k));
+      ctx.fillStyle = 'rgba(0,0,0,.35)'; circle(0, 4, R); ctx.fill();
+      ctx.fillStyle = set ? '#ffcc33' : '#ffffff'; circle(0, 0, R); ctx.fill();
+      ctx.strokeStyle = set ? '#8a6400' : '#1b2a22'; ctx.lineWidth = 3.5; circle(0, 0, R - 1.75); ctx.stroke();
+      ctx.rotate(p.ang); ctx.translate(2 + 3 * k, 0); ctx.scale(R, R);
+      ctx.beginPath(); ctx.moveTo(-.55, -.16); ctx.lineTo(.02, -.16); ctx.lineTo(.02, -.44); ctx.lineTo(.62, 0); ctx.lineTo(.02, .44); ctx.lineTo(.02, .16); ctx.lineTo(-.55, .16); ctx.closePath();
+      ctx.fillStyle = '#1b2a22'; ctx.fill();
+      ctx.restore(); });
   }
   function drawSwitch(s, L) {
     const A = P(s.id), busy = occupied(s), r = swR * (1 + s.pulse * .12), x = A.x + (s.shake > 0 ? Math.sin(s.shake * 38) * 7 * s.shake : 0), y = A.y;
@@ -953,11 +1032,13 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
       const p = P(id), s = (1 + Math.max(0, n.pulse) * .25) * stS; L.home(n, p, s);
       if (n.pulse < 0) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 5; ctx.lineCap = 'round'; line(p.x - 14, p.y - 6, p.x + 14, p.y + 22); line(p.x + 14, p.y - 6, p.x - 14, p.y + 22); }
     }
+    if (promptSw) drawWaitGlow(promptSw);
     if (ctrlName === 'lever') switches.forEach(drawLever);
     switches.forEach(s => ctrlName === 'arrow' ? drawSwitch(s, L) : drawPoints(s));
     flashes.forEach(f => { ctx.strokeStyle = `rgba(255,255,255,${1 - f.t / .6})`; ctx.lineWidth = 4; circle(f.x, f.y + 8, 30 + f.t * 90); ctx.stroke(); });
     // vehicles go on top of the switch buttons, so they are never hidden
     trains.forEach(t => L.vehicle(t));
+    if (promptSw) drawWaitArrows(promptSw);
     drawHint();
     // every press shows a ripple where the finger landed
     ripples.forEach(p => { const k = p.t / .45; ctx.strokeStyle = `rgba(255,255,255,${(1 - k) * (p.hit ? .95 : .5)})`; ctx.lineWidth = p.hit ? 5 : 3; circle(p.x, p.y, 12 + k * (p.hit ? 40 : 22)); ctx.stroke(); });
@@ -976,7 +1057,7 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
       if (a >= 12 && a <= end && d <= bd) { bd = d; best = { s, i }; }
     }));
     if (best) return best;
-    switches.forEach(s => { const p = P(s.id); if (Math.hypot(p.x - x, p.y - y) <= HUB_TAP_R && !best) best = { s, i: 1 - s.state }; });
+    switches.forEach(s => { const p = P(s.id); if (Math.hypot(p.x - x, p.y - y) <= HUB_TAP_R && !best) best = { s, i: 1 - s.state, hub: true }; });
     return best;
   }
   // Arrow mode: a tap anywhere near a switch flips it: the nearest switch within the tap reach wins.
@@ -989,9 +1070,14 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
   $('stage').addEventListener('pointerdown', e => {
     e.preventDefault(); if (phase !== 'play' || paused) return;
     const { x, y } = stageXY(e);
-    if (ctrlName === 'rail') { const h = railHit(x, y); ripples.push({ x, y, t: 0, hit: !!h }); if (h) setBranch(h.s, h.i); return; }
+    // Kid mode: the big arrows at a waiting switch work in every control mode
+    const wa = waitArrowHit(x, y); if (wa) { ripples.push({ x, y, t: 0, hit: true }); setBranch(wa.s, wa.i); return; }
+    if (ctrlName === 'rail') { const h = railHit(x, y); ripples.push({ x, y, t: 0, hit: !!h }); if (!h) return;
+      if (h.hub && waiter(h.s)) { const p = P(h.s.id); setBranch(h.s, sideOf(h.s, x, p.x)); } else setBranch(h.s, h.i); return; }
     if (ctrlName === 'lever') { leverDown(e, x, y); return; }
-    const best = arrowHit(x, y); ripples.push({ x, y, t: 0, hit: !!best }); if (best) flip(best);
+    const best = arrowHit(x, y); ripples.push({ x, y, t: 0, hit: !!best }); if (!best) return;
+    if (waiter(best)) setBranch(best, sideOf(best, x, P(best.id).x));   // a vehicle is waiting: the side of the button tapped is the way it goes
+    else flip(best);
   });
   // Lever mode: tap a lever, or slide it left or right. A slide pushes it over as soon as the finger has moved LEVER_DRAG px towards
   // the other side; sliding back again pushes it back. A tap (finger lifted without sliding) flips it.
@@ -1007,7 +1093,7 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
   }
   function endGesture(tap) {
     const g = gesture; if (!g) return; gesture = null; g.s.grab = false; g.s.drag = 0;
-    if (tap && !g.moved && !g.flipped) flip(g.s);
+    if (tap && !g.moved && !g.flipped) { if (waiter(g.s)) setBranch(g.s, sideOf(g.s, g.sx, g.s.lv.x)); else flip(g.s); }   // Kid mode: tap the side you want
   }
   $('stage').addEventListener('pointermove', e => {
     const g = gesture; if (!g || e.pointerId !== g.id) return;
@@ -1034,6 +1120,9 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
     get hint() { const h = tut && tut.spot, r = cv.getBoundingClientRect(); return { on: hintOn, t: tut ? tut.t : null, flipped: !!(tut && tut.flipped),
       spot: h ? { x: r.left + h.x, y: r.top + h.y, slide: h.slide } : null, caption: $('hint').classList.contains('show') ? $('hint').textContent : '' }; },
     _switch(id) { return nodes[id]; }, get route() { return activeRoute(); }, get sound() { return soundOn(); }, get soundsPlayed() { return soundsPlayed; },   // tests only: set a switch's starting position
+    get waiting() { const r = cv.getBoundingClientRect(), s = promptSw; return { on: !!D.wait, prompt: s ? s.id : null, caption: $('hint').classList.contains('show') ? $('hint').textContent : '',
+      arrows: s ? [0, 1].map(i => { const p = waitArrowAt(s, i); return { x: r.left + p.x, y: r.top + p.y, r: waitArrowR() }; }) : [],
+      stopped: trains.filter(t => switches.some(w => waiter(w) === t && t.cum[t.cum.length - 1] - waitStop() - t.d < .5)).length }; },
     get controls() { return ctrlName; }, setControls(name) { return setControls(name); },
     get paused() { return paused; }, start(n) { start(Math.max(1, n | 0)); },
     layout() {   // sizes the layout test checks: switch buttons, tap reach and the boxes the stations fill
@@ -1043,11 +1132,14 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
     },
     snapshot() {
       const stage = cv.getBoundingClientRect();
-      return { switches: switches.map(s => ({ id: s.id, state: s.state, busy: occupied(s), x: stage.left + P(s.id).x, y: stage.top + P(s.id).y, anim: s.anim,
+      const arrowsAt = s => [0, 1].map(i => { const p = waitArrowAt(s, i); return { x: stage.left + p.x, y: stage.top + p.y, r: waitArrowR() }; });
+      return { waitMode: !!D.wait, switches: switches.map(s => ({ id: s.id, state: s.state, busy: occupied(s), x: stage.left + P(s.id).x, y: stage.top + P(s.id).y, anim: s.anim, r: swR,
+          // Kid mode: the two "go this way" arrows, while a vehicle waits here (null otherwise); arrowSpots: where they would be, always
+          wait: waiter(s) ? arrowsAt(s) : null, arrowSpots: arrowsAt(s),
           lever: s.lv && { x: stage.left + s.lv.x, y: stage.top + s.lv.y - leverR() * .5, r: leverR(), clear: s.lv.clear, lean: Math.sign(leverTilt(s)) },
           // rail mode: where each branch's track is (switch and far end, page px), for tests that tap along it
           branches: s.next.map(m => ({ to: m, ax: stage.left + P(s.id).x, ay: stage.top + P(s.id).y, bx: stage.left + P(m).x, by: stage.top + P(m).y })) })),
-        trains: trains.map(t => ({ colour: t.colour, at: t.route[t.route.length - 1], d: t.cum[t.cum.length - 1] - t.d })),
+        trains: trains.map(t => ({ colour: t.colour, at: t.route[t.route.length - 1], d: t.cum[t.cum.length - 1] - t.d, pos: t.d, waiting: switches.some(w => waiter(w) === t) })),
         // which branch each switch must point to for each colour
         routes: Object.fromEntries(switches.map(s => [s.id, Object.fromEntries(COLOURS.map(c => {
           const reaches = (id) => { const n = nodes[id]; return n.kind === 'station' ? n.colour === c : n.next.some(reaches); };

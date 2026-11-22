@@ -133,7 +133,8 @@ const want = n => !only.length || only.includes(n);
           const next = s.trains.filter(t => t.at === sw.id).sort((a, b) => a.d - b.d)[0];
           if (!next) continue;
           const want = s.routes[sw.id][next.colour];
-          if (want !== sw.state && !sw.busy) await page.mouse.click(sw.x, sw.y);
+          if (s.waitMode) { if (sw.wait && !sw.busy) await page.mouse.click(sw.wait[want].x, sw.wait[want].y); }   // Kid: vehicles wait; tap its arrow
+          else if (want !== sw.state && !sw.busy) await page.mouse.click(sw.x, sw.y);
         }
         await page.waitForTimeout(40);
       }
@@ -169,7 +170,8 @@ const want = n => !only.length || only.includes(n);
       const s = await snap();
       for (const sw of s.switches) {
         const next = s.trains.filter(t => t.at === sw.id).sort((a, b) => a.d - b.d)[0];
-        if (next && s.routes[sw.id][next.colour] === sw.state && !sw.busy) await page.mouse.click(sw.x, sw.y);
+        if (s.waitMode) { if (next && sw.wait && !sw.busy) await page.mouse.click(sw.wait[1 - s.routes[sw.id][next.colour]].x, sw.wait[1 - s.routes[sw.id][next.colour]].y); }
+        else if (next && s.routes[sw.id][next.colour] === sw.state && !sw.busy) await page.mouse.click(sw.x, sw.y);
       }
       await page.waitForTimeout(40);
     }

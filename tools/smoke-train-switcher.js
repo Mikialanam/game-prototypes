@@ -34,7 +34,7 @@ const PHONES = {
   const snap = page => page.evaluate(() => __trains.snapshot());
   const text = (page, sel) => page.textContent(sel);
   // True when every vehicle heading for a switch will find it pointing the right way: a safe moment to stop and take a picture.
-  const settled = s => s.trains.every(t => !s.routes[t.at] || s.routes[t.at][t.colour] === s.switches.find(w => w.id === t.at).state);
+  const settled = s => s.trains.every(t => !t.waiting) && s.trains.every(t => !s.routes[t.at] || s.routes[t.at][t.colour] === s.switches.find(w => w.id === t.at).state);
   // The same bot as tools/smoke-test-2.js: point each switch at the branch the next approaching vehicle needs.
   async function playLevel(page, onTick) {
     const t0 = Date.now();
@@ -45,7 +45,8 @@ const PHONES = {
         const next = s.trains.filter(t => t.at === sw.id).sort((a, b) => a.d - b.d)[0];
         if (!next) continue;
         const want = s.routes[sw.id][next.colour];
-        if (want !== sw.state && !sw.busy) await page.mouse.click(sw.x, sw.y);
+        if (s.waitMode) { if (sw.wait && !sw.busy) await page.mouse.click(sw.wait[want].x, sw.wait[want].y); }   // Kid: vehicles wait; tap its arrow
+        else if (want !== sw.state && !sw.busy) await page.mouse.click(sw.x, sw.y);
       }
       if (onTick) await onTick(await snap(page));
       await page.waitForTimeout(40);
