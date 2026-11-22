@@ -13,8 +13,8 @@ Stay on scope: only this Train Switcher change.
 | 1 | Read progress, commits and the game; write this plan | 10 min | done |
 | 2 | Kid mode: vehicle stops before each switch, waits for a tap on that switch, then moves on; vehicles behind queue up; no fail from waiting | 30 min | done |
 | 3 | Make the waiting switch obvious: pulsing glow ring + bouncing arrow, caption "Tap the switch!" | 20 min | done |
-| 4 | Tests: new checks in a smoke test (Kid waits, tap releases, Adult/Expert unchanged); rerun existing Train Switcher tests; screenshots | 30 min | |
-| 5 | README, handover | 10 min | |
+| 4 | Tests: new checks in a smoke test (Kid waits, tap releases, Adult/Expert unchanged); rerun existing Train Switcher tests; screenshots | 30 min | done |
+| 5 | README, handover | 10 min | done |
 
 ## Later (not this run)
 - Playtest with the same child (table in RATING-SHEET.md).
@@ -23,6 +23,14 @@ Stay on scope: only this Train Switcher change.
 ## Log
 - Brought the session branch up to the latest Train Switcher work (fast-forward to 96a2f37). Baseline: `smoke-train-switcher.js` 72/72, `smoke-train-controls.js` 90/91 (one lever-tap check on iPhone 13 failed before any change; run in parallel with the other test).
 - Kid waits done: `wait: true` on Kid in `DIFFICULTIES`. A vehicle stops in front of each switch and waits with no limit; vehicles behind queue a train-length apart and new ones only enter when the entry is clear. The waiting switch gets a warm pulsing glow with a ripple ring, two big pulsing arrows (gold = way it's set now) fanned out left and right, a soft ping, and the caption "Which way? Tap an arrow". Tapping an arrow, the track (rail), the side of the lever, or the side of the arrow button picks that way and the vehicle goes. Start card in Kid says vehicles wait. Adult/Expert untouched. New `tools/smoke-train-wait.js` 47/47; old bots taught to answer waiting vehicles. Next: run the existing tests.
+- Tests: `smoke-train-wait.js` 47/47 (twice), `smoke-train-controls.js` 91/91, `smoke-train-switcher.js` 72/72, `smoke-test-2.js train-switcher` wins levels 1–4 and the wrong-station check, `smoke-test.js` passes. Two test fixes: the busy-switch check now lets the waiting Kid vehicle through before tapping the busy switch, and expects the Kid wait rule on the start card; the wrong-station bot copes with a switch whose branches can't reach the vehicle's colour. Screenshots checked in all three themes and modes. README updated.
+
+## Handover (Kid waits)
+**Done:** On 🧸 Kid, vehicles stop before every switch and wait with no time limit; the waiting switch glows and shows two big pulsing arrows plus a caption; tapping an arrow (or the mode's own control on the side you want) sets the switch and lets the vehicle go. Adult, Expert and the Slow / Normal / Fast speeds are unchanged. All on `claude/serene-brahmagupta-k4uwiz`.
+
+**Not done:** not published to the Pages branch `claude/intelligent-lamport-sbfavc` (needs Miki's go-ahead).
+
+**Choices to revisit after a playtest:** a wrong pick still ends the level (Kid still has to match colours); in Arrow and Lever modes a tap on the waiting switch picks the side tapped rather than flipping it; only the front waiting vehicle gets the arrows; the caption sits at the top and can cover the end of the queue on small phones (`WAIT_CAPTION = ''` turns it off).
 
 ---
 

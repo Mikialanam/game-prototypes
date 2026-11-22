@@ -5,6 +5,7 @@
 ## How to play
 - Coloured trains (or boats, or planes) come in at the top. **Move the switches** so each one reaches the **station (dock, airport) of its own colour**. How you move a switch depends on the control mode (below).
 - The **active route** (the way a vehicle would go right now, from the entry to its station) **glows** and its station has a halo; the other branches are dimmed. Every switch visibly swings across when it moves, with a short "clack-clack".
+- **Kid mode waits for you:** on 🧸 Kid, every vehicle **stops just before each switch and waits** for as long as it takes (no timer, nothing fails while it waits). The waiting switch **glows** with a warm pulsing light and a rippling ring, two big **pulsing arrows** appear beside it (the gold one is the way it's set now), with a soft ping and the caption "Which way? Tap an arrow". Tap an arrow and the switch swings that way and the vehicle moves on. The mode's own control works too, picking the side you tap: the track you want (Tap the rail), the left or right side of the lever (Lever), or the left or right side of the arrow button (Arrow). Vehicles behind queue up a train-length apart, and new ones only come in when the entry is clear. A wrong pick still goes to the wrong station. Adult and Expert don't wait.
 - A switch won't move while a vehicle is on it (it turns grey and red and shakes). Wait for it to pass. On Expert, trying to move it then is a **crash**.
 - A wrong station ends the level; tap **Try again**. Deliver every vehicle to clear it.
 - **Level 1 is a gentle warm-up on every difficulty:** one switch, two stations, 3 vehicles, slow, far apart (`FIRST_LEVEL`).
@@ -26,7 +27,7 @@ Open Settings with the ⚙️ gear on the start card, or during play tap the top
 
 ## Difficulty and speed
 Pick on the start card, or any time with the button in the top-left corner (it also changes the theme).
-- **Who's playing?** 🧸 **Kid** (slowest, fewest vehicles, no crashes), 🙂 **Adult** (a bit slower than the original, no crashes), 🔥 **Expert** (faster than the original, and tapping a switch under a vehicle crashes). Same levels underneath. Each difficulty keeps its own best level (a best from before difficulties existed shows under Adult). Changing difficulty mid-level starts again at level 1.
+- **Who's playing?** 🧸 **Kid** (slowest, fewest vehicles, no crashes, and every vehicle waits at each switch until you pick a way), 🙂 **Adult** (a bit slower than the original, no crashes), 🔥 **Expert** (faster than the original, and tapping a switch under a vehicle crashes). Same levels underneath. Each difficulty keeps its own best level (a best from before difficulties existed shows under Adult). Changing difficulty mid-level starts again at level 1.
 - **Speed:** 🐢 Slow, ▶️ Normal, 🐇 Fast, on top of any difficulty. It changes straight away, even mid-level, and vehicles keep the same spacing.
 - With no crashes, a switch with a vehicle on it just shakes and stays put.
 
@@ -38,9 +39,11 @@ Pick on the start card, or any time with the button in the top-left corner (it a
 ## Tunable constants (top of the `<script>`)
 The `LEVELS` table, `EXTRA_TRAINS_PER_LEVEL`, `EXTRA_SPEED_PER_LEVEL`, `EXTRA_GAP_PER_LEVEL`, `MIN_GAP`, `SWITCH_ZONE`, `CAR_COUNT`, `CAR_SPACING`,
 `SWITCH_SIZE` (share of screen width), `SWITCH_SIZE_MAX`, `SWITCH_GAP`, `ARROW_MIN_TILT`, `TAP_RADIUS`, `DIFFICULTIES` (speed, gap, vehicles and crash rule per difficulty), `DEFAULT_DIFFICULTY`, `MIN_TRAINS`, `SPEEDS`, `DEFAULT_SPEED`, `COLOURS`,
-`DEFAULT_THEME`, the `THEMES` table (names, words, colours per theme), `CONTROLS` (labels, start-card wording and hint caption per mode), `DEFAULT_CONTROLS`, `SWITCH_MOVE_TIME`, `RAIL_TAP_WIDTH`, `HUB_TAP_R`, `POINTS_LEN`, `LEVER_SIZE`, `LEVER_TILT`, `LEVER_TAP_R`, `LEVER_DRAG`, `TUTORIAL`, `HINT_WAIT`, `FIRST_LEVEL`, `SOUND_ON`.
+`DEFAULT_THEME`, the `THEMES` table (names, words, colours per theme), `CONTROLS` (labels, start-card wording and hint caption per mode), `DEFAULT_CONTROLS`, `SWITCH_MOVE_TIME`, `RAIL_TAP_WIDTH`, `HUB_TAP_R`, `POINTS_LEN`, `LEVER_SIZE`, `LEVER_TILT`, `LEVER_TAP_R`, `LEVER_DRAG`, `TUTORIAL`, `HINT_WAIT`, `FIRST_LEVEL`, `SOUND_ON`, and for Kid's waiting: `wait` in `DIFFICULTIES`, `WAIT_STOP`, `WAIT_NEAR`, `FOLLOW_GAP`, `WAIT_ARROW_R`, `WAIT_CAPTION`.
 
 ## Tests
 `node tools/smoke-train-controls.js` checks the three switch-control modes on emulated phones: Settings (start and pause cards, saved choice, mid-level change), rail taps along and beside every branch, lever placement and tap/slide rules, the visible switch movement, the first-time tutorial, sound on/off, the easy first level, the active route, and a bot winning levels 1 and 2 with each mode's own taps.
+
+`node tools/smoke-train-wait.js` checks Kid's waiting on emulated phones: the vehicle stops in front of the switch and stays put with no input (8s, and through a pause), the switch glows, the two arrows are big, on screen and clear of stations, switches and levers on every level shape, an arrow tap or each mode's own tap sets the way and lets it go, vehicles queue, a wrong pick still fails, Adult and Expert never wait, and a bot wins Kid levels in every mode.
 
 `node tools/smoke-train-switcher.js` plays all three themes on emulated phones (iPhone 13, iPhone SE, 360x640) and checks the tap zone, nearest-switch taps, saved theme, pause and both busy-switch rules (no crash by default, crash when switched on).

@@ -170,7 +170,8 @@ const want = n => !only.length || only.includes(n);
       const s = await snap();
       for (const sw of s.switches) {
         const next = s.trains.filter(t => t.at === sw.id).sort((a, b) => a.d - b.d)[0];
-        if (s.waitMode) { if (next && sw.wait && !sw.busy) await page.mouse.click(sw.wait[1 - s.routes[sw.id][next.colour]].x, sw.wait[1 - s.routes[sw.id][next.colour]].y); }
+        if (s.waitMode) { const r = next ? s.routes[sw.id][next.colour] : -1, wrong = r < 0 ? 0 : 1 - r;   // Kid: answer the waiting vehicle the wrong way
+          if (next && sw.wait && !sw.busy) await page.mouse.click(sw.wait[wrong].x, sw.wait[wrong].y); }
         else if (next && s.routes[sw.id][next.colour] === sw.state && !sw.busy) await page.mouse.click(sw.x, sw.y);
       }
       await page.waitForTimeout(40);

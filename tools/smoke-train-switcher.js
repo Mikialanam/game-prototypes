@@ -76,7 +76,10 @@ const PHONES = {
     return { fits: b.top >= 0 && b.left >= 0 && b.bottom <= innerHeight && b.right <= innerWidth && c.scrollHeight <= c.clientHeight + 1,
       smallButtons: [...c.querySelectorAll('button')].filter(x => x.getBoundingClientRect().height < 48).map(x => x.textContent.trim()) };
   }, sel);
-  const waitBusy = async page => { for (let i = 0; i < 600; i++) { const b = (await snap(page)).switches.find(w => w.busy); if (b) return b; await page.waitForTimeout(25); } return null; };
+  // wait until a vehicle is on a switch. In Kid mode vehicles stop at a switch until told which way, so let it through the way it is set.
+  const waitBusy = async page => { for (let i = 0; i < 600; i++) { const s = await snap(page), b = s.switches.find(w => w.busy); if (b) return b;
+    const w = s.switches.find(x => x.wait); if (w) await page.mouse.click(w.wait[w.state].x, w.wait[w.state].y);
+    await page.waitForTimeout(25); } return null; };
 
   // ---------- 1. every theme on an iPhone 13: pick it on the start card, win levels 1 and 2 ----------
   async function playTheme(theme) {
@@ -203,8 +206,9 @@ const PHONES = {
     check('header theme button pauses play, changes theme and resumes', summary.pause.paused && summary.pause.stoodStill && summary.pause.theme === 'boats' && summary.pause.movesAgain && summary.pause.phase === 'play' && summary.pause.level === 1 && pc.fits && !pc.smallButtons.length, { ...summary.pause, pc });
 
     // default difficulty (Kid): tapping a busy switch does nothing; it shakes and stays put, nothing crashes
+    // (the start card's rule for Kid is the "vehicles wait at a switch for you" one; no crash rule)
     await page.evaluate(() => { __trains.setTheme('trains'); __trains.start(1); });
-    const safeRuleShown = await page.evaluate(() => !document.querySelector('#ruleSafe').hidden && document.querySelector('#ruleCrash').hidden);
+    const safeRuleShown = await page.evaluate(() => !document.querySelector('#ruleWait').hidden && document.querySelector('#ruleCrash').hidden);
     const busy = await waitBusy(page);
     if (check('a vehicle reaches the switch', !!busy)) {
       await page.touchscreen.tap(busy.x + 55, busy.y);

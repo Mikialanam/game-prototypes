@@ -138,7 +138,8 @@ const PHONES = {
     // keep answering wrongly at any later switch until it reaches a station
     for (let k = 0; k < 200; k++) { const ph = await page.evaluate(() => __trains.phase); if (ph !== 'play') break;
       s = await snap(page); const lead = s.trains.find(x => x.colour === t.colour && x.at !== 's1');
-      if (lead && s.routes[lead.at]) { const sw = s.switches.find(x => x.id === lead.at); if (sw.wait && !sw.busy) await page.touchscreen.tap(sw.wait[1 - s.routes[lead.at][t.colour]].x, sw.wait[1 - s.routes[lead.at][t.colour]].y); }
+      if (lead && s.routes[lead.at]) { const sw = s.switches.find(x => x.id === lead.at), r = s.routes[lead.at][t.colour], wrong = r < 0 ? 0 : 1 - r;
+        if (sw.wait && !sw.busy) await page.touchscreen.tap(sw.wait[wrong].x, sw.wait[wrong].y); }
       await page.waitForTimeout(60); }
     await page.waitForSelector('#failOv.show', { timeout: 8000 });
     out.wrong = await page.textContent('#failTitle');
