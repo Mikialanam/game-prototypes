@@ -47,6 +47,10 @@
   .pick .e { font-size: 32px; line-height: 1; }
   .picker .pick { font-size: 14px; }
   @media (max-width: 340px) { .picker .pick { font-size: 12.5px; } }
+  /* vehicle type picker: the types of the chosen theme, plus Mix */
+  .tpicker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 2px 0 6px; }
+  .tpicker .pick { min-height: 54px; gap: 2px; font-size: 13px; padding: 4px 2px; }
+  .tpicker .pick .e { font-size: 22px; }
   .dpicker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 4px 0 8px; }
   .dpicker .pick { min-height: 56px; flex-direction: row; gap: 5px; padding: 6px 2px; white-space: nowrap; }
   @media (max-width: 340px) { .dpicker .pick { font-size: 14px; gap: 3px; } .dpicker .pick .e { font-size: 18px !important; } }
@@ -85,7 +89,7 @@
   @media (max-height: 700px) {
     #startOv .emoji { display: none; } .card { padding: 14px 14px; } .card h2 { font-size: 22px; margin-bottom: 4px; }
     .picker { margin: 6px 0 4px; } .picker .pick { min-height: 64px; gap: 2px; } .picker .pick .e { font-size: 26px; }
-    .dpicker { margin: 2px 0 4px; } .dpicker .pick { min-height: 48px; } .plabel { margin: 6px 0 2px; font-size: 12px; }
+    .dpicker { margin: 2px 0 4px; } .dpicker .pick { min-height: 48px; } .tpicker .pick { min-height: 48px; } .tpicker .pick .e { font-size: 19px; } .plabel { margin: 6px 0 2px; font-size: 12px; }
     .rule { font-size: 15px; line-height: 1.3; margin: 5px 0; } button.btn { min-height: 56px; margin-top: 8px; }
   }
 </style>
@@ -106,6 +110,8 @@
     <div class="emoji" id="startEmoji">🚂</div>
     <h2 class="withgear" id="startTitle">Train Switcher</h2>
     <div class="picker"></div>
+    <p class="plabel">Which <span data-w="one">train</span>?</p>
+    <div class="tpicker"></div>
     <p class="plabel">Who's playing?</p>
     <div class="dpicker"></div>
     <p class="plabel">Speed</p>
@@ -146,6 +152,8 @@
     <button class="gear setOpen" aria-label="Settings">⚙️</button>
     <h2 class="withgear" id="themeHead">Theme, difficulty, speed</h2>
     <div class="picker"></div>
+    <p class="plabel">Which <span data-w="one">train</span>?</p>
+    <div class="tpicker"></div>
     <p class="plabel">Who's playing?</p>
     <div class="dpicker"></div>
     <p class="plabel">Speed</p>
@@ -221,6 +229,15 @@ const DEFAULT_SPEED          = 'normal';
 const DEFAULT_DIFFICULTY     = 'kid'; // difficulty the first time the game is opened (after that the player's pick is saved)
 const MIN_TRAINS             = 3;     // a level never has fewer vehicles than this
 const COLOURS = ['#ff5d5d', '#4da3ff', '#ffcc33', '#b46bff']; // red, blue, yellow, purple: the same in every theme, because matching colours is the game
+// Vehicle types: each theme has its own, picked under the theme (saved per theme). Only the drawing changes: every type is the same
+// length, speed and size, so the game plays the same. The first type of each theme is the default. MIX_TYPE sends a different one each time.
+const VEHICLE_TYPES = {
+  trains: [{ id: 'steam', emoji: '🚂', label: 'Steam' },  { id: 'bullet', emoji: '🚄', label: 'Bullet' }, { id: 'freight', emoji: '🚃', label: 'Freight' }],
+  boats:  [{ id: 'motor', emoji: '🚤', label: 'Motor', name: 'Motor boat' }, { id: 'sail', emoji: '⛵', label: 'Sail', name: 'Sailing boat' }, { id: 'ferry', emoji: '🛳️', label: 'Ferry' }],
+  planes: [{ id: 'jet', emoji: '✈️', label: 'Jet' },      { id: 'prop', emoji: '🛩️', label: 'Prop', name: 'Propeller plane' }, { id: 'heli', emoji: '🚁', label: 'Heli', name: 'Helicopter' }],
+  cars:   [{ id: 'car', emoji: '🚗', label: 'Car' },      { id: 'bus', emoji: '🚌', label: 'Bus' }, { id: 'truck', emoji: '🚚', label: 'Truck' }],
+};
+const MIX_TYPE               = { id: 'mix', emoji: '🎲', label: 'Mix', name: 'A mix of all of them' };
 const DEFAULT_THEME          = 'trains'; // theme shown the first time the game is opened (after that the player's pick is saved)
 // One row per theme. A theme only changes the look and the words; the levels, speeds and rules stay the same.
 //   emoji, label: the picker button.   title: the game's name.   one, many: the vehicle.   place, places: where it goes.
@@ -349,6 +366,12 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
   const bestOf = () => (load().bests || {})[diffName] || 0;
   let ctrlName = CONTROLS[load().controls] ? load().controls : CONTROLS[DEFAULT_CONTROLS] ? DEFAULT_CONTROLS : 'arrow', C = CONTROLS[ctrlName];
   let themeName = THEMES[load().theme] ? load().theme : THEMES[DEFAULT_THEME] ? DEFAULT_THEME : Object.keys(THEMES)[0], T = THEMES[themeName];
+  // vehicle type for the current theme (saved per theme in `types`); 'mix' = each vehicle gets its own type when it comes in
+  const typesOf = name => VEHICLE_TYPES[name] && VEHICLE_TYPES[name].length ? VEHICLE_TYPES[name] : [{ id: 'default', emoji: THEMES[name].emoji, label: THEMES[name].label }];
+  const savedType = name => { const t = (load().types || {})[name]; return t === MIX_TYPE.id || typesOf(name).some(x => x.id === t) ? t : typesOf(name)[0].id; };
+  let typeName = savedType(themeName);
+  // the drawing to use for a vehicle: the picked type, or its own random one in Mix
+  const kindOf = t => typeName === MIX_TYPE.id ? typesOf(themeName)[t.kind % typesOf(themeName).length].id : typeName;
   const cv = $('cv'), ctx = cv.getContext('2d'); let W = 0, H = 0;
   const P = id => ({ x: nodes[id].x * W, y: nodes[id].y * H });
   const dist = (a, b) => Math.hypot(P(a).x - P(b).x, P(a).y - P(b).y);
@@ -447,7 +470,7 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
     let target = nodes[stationIds[Math.floor(Math.random() * stationIds.length)]];
     if (spawned === 0 && firstColour) target = Object.values(nodes).find(n => n.kind === 'station' && n.colour === firstColour) || target;
     const first = nodes.e.next[0];
-    trains.push({ colour: target.colour, route: ['e', first], cum: [0, dist('e', first)], d: 0, go: {} });   // go: switches the player has let it through (Kid)
+    trains.push({ colour: target.colour, route: ['e', first], cum: [0, dist('e', first)], d: 0, go: {}, kind: Math.floor(Math.random() * 12) });   // kind: its type in Mix   // go: switches the player has let it through (Kid)
     spawned++;
   }
 
@@ -579,7 +602,27 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
     document.querySelectorAll('[data-w]').forEach(el => el.textContent = T[el.dataset.w]);
     $('howTo').textContent = C.how;
     document.querySelectorAll('.picker .pick').forEach(b => { const on = b.dataset.theme === name; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+    typeName = savedType(name); buildTypePickers();
     renderCard(); if (cfg) updateBar();
+    return true;
+  }
+  // ---------- vehicle types: the picker shows the current theme's types plus Mix ----------
+  function buildTypePickers() {
+    document.querySelectorAll('.tpicker').forEach(box => {
+      box.textContent = '';
+      [...typesOf(themeName), MIX_TYPE].forEach(k => {
+        const b = document.createElement('button'), e = document.createElement('span'), l = document.createElement('span'), on = k.id === typeName;
+        b.type = 'button'; b.className = 'pick' + (on ? ' on' : ''); b.dataset.type = k.id; b.setAttribute('aria-pressed', on); b.setAttribute('aria-label', k.name || k.label);
+        e.className = 'e'; e.textContent = k.emoji; l.textContent = k.label;
+        b.append(e, l); b.addEventListener('click', () => { setType(k.id); beep(560, .06); buzz(6); }); box.appendChild(b);
+      });
+    });
+  }
+  function setType(name, remember = true) {
+    if (name !== MIX_TYPE.id && !typesOf(themeName).some(k => k.id === name)) return false;
+    typeName = name;
+    if (remember) { const s = load(); s.types = s.types || {}; s.types[themeName] = name; save(s); }   // saved per theme
+    document.querySelectorAll('.tpicker .pick').forEach(b => { const on = b.dataset.type === name; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
     return true;
   }
   function openThemes() {
@@ -1176,6 +1219,8 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
   // test hook (a peek for the automated smoke tests; setTheme and start are for tests only)
   window.__trains = { get phase() { return phase; }, get level() { return level; },
     get theme() { return themeName; }, setTheme(name) { return setTheme(name); },
+    get type() { return typeName; }, setType(name) { return setType(name); }, get types() { return [...typesOf(themeName).map(k => k.id), MIX_TYPE.id]; },
+    get kinds() { return trains.map(kindOf); },
     get difficulty() { return diffName; }, setDifficulty(name) { return setDifficulty(name); }, get crash() { return D.crash; }, get speed() { return speedName; }, setSpeed(name) { return setSpeed(name); }, cfg(n) { return levelCfg(n); },
     get hint() { const h = tut && tut.spot, r = cv.getBoundingClientRect(); return { on: hintOn, t: tut ? tut.t : null, flipped: !!(tut && tut.flipped),
       spot: h ? { x: r.left + h.x, y: r.top + h.y, slide: h.slide } : null, caption: $('hint').classList.contains('show') ? $('hint').textContent : '' }; },

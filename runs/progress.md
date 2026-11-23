@@ -12,7 +12,7 @@ Stay on scope: only these two Train Switcher additions.
 |---|---|---|---|
 | 1 | Resume: read progress and commits; write this plan | 5 min | done |
 | 2 | Cars theme: road look (asphalt, centre line, kerbs), car drawing, garages, words, page colours; theme picker fits four | 30 min | done |
-| 3 | Vehicle types: a TYPES table per theme, a "Type" picker (theme card and start card), saved per theme, "Mix" option | 25 min | |
+| 3 | Vehicle types: a TYPES table per theme, a "Type" picker (theme card and start card), saved per theme, "Mix" option | 25 min | done |
 | 4 | Draw the new types for trains and boats | 25 min | |
 | 5 | Draw the new types for planes and cars | 25 min | |
 | 6 | Tests: four themes and every type in the smoke tests; rerun all Train Switcher tests; check screenshots on small phones | 30 min | |
@@ -25,6 +25,7 @@ Stay on scope: only these two Train Switcher additions.
 ## Log
 - Resumed: previous run (Kid waits) complete and live; working tree clean.
 - Cars theme done (`cars` in `THEMES`, look `road`): grey roads with kerbs and a dashed centre line, bushes and flowers on grass, cars seen from above, garages with an open door and a P, traffic cones on a closed road (Arrow mode), "Bump!" if crashed. In Tap-the-rail and Lever modes the moving switch is a painted road arrow (a white block looked like a white car). Theme picker is four across; start card still fits on iPhone SE. Test theme list includes cars. Next: vehicle types.
+- Vehicle types: `VEHICLE_TYPES` (three per theme) and `MIX_TYPE`. A "Which train / boat / plane / car?" row of four buttons under the theme picker on the start card and the theme card; it rebuilds when the theme changes; choice saved per theme (`types`). In Mix each vehicle keeps its own random type. Start card still fits on iPhone SE. Drawings still the default for every type. Next: draw the train and boat types.
 
 ---
 
