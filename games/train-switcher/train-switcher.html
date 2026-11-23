@@ -40,11 +40,13 @@
   button.ghost:active { box-shadow: none; }
   button.ghost.line { border: 2px solid rgba(255,255,255,.2); color: var(--text); }
   /* theme picker: three big buttons, the chosen one lit up */
-  .picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px 0 10px; }
+  .picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 12px 0 10px; }
   .pick { position: relative; min-height: 80px; border: 3px solid transparent; border-radius: 16px; padding: 6px 2px; font-family: inherit;
     background: rgba(255,255,255,.09); color: var(--muted); font-size: 16px; font-weight: 800;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
   .pick .e { font-size: 32px; line-height: 1; }
+  .picker .pick { font-size: 14px; }
+  @media (max-width: 340px) { .picker .pick { font-size: 12.5px; } }
   .dpicker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 4px 0 8px; }
   .dpicker .pick { min-height: 56px; flex-direction: row; gap: 5px; padding: 6px 2px; white-space: nowrap; }
   @media (max-width: 340px) { .dpicker .pick { font-size: 14px; gap: 3px; } .dpicker .pick .e { font-size: 18px !important; } }
@@ -223,9 +225,11 @@ const DEFAULT_THEME          = 'trains'; // theme shown the first time the game 
 // One row per theme. A theme only changes the look and the words; the levels, speeds and rules stay the same.
 //   emoji, label: the picker button.   title: the game's name.   one, many: the vehicle.   place, places: where it goes.
 //   countIcon: shown next to the delivered count.   crashEmoji, crashTitle, oops: the words when an arrow is tapped under a vehicle.
-//   look: which canvas drawings to use: 'rails' (track and trains), 'water' (channel and boats) or 'sky' (dashed route, clouds and planes).
+//   look: which canvas drawings to use: 'rails' (track and trains), 'water' (channel and boats), 'sky' (dashed route, clouds and planes)
+//         or 'road' (roads, junctions, cars and garages).
 //   page: [background, panel, text, quiet text] colours of the header and cards.   ground: [top, bottom] colours of the play area.
 //   path: three route colours. rails: [bed, sleepers, rails]. water: [banks, water, ripples]. sky: [lane glow, dashes, stars and clouds].
+//         road: [kerbs, tarmac, centre line].
 //   sw: [button, rim, arrow] colours of the switch button. Keep them away from the four COLOURS.
 const THEMES = {
   trains: { emoji: '🚂', label: 'Trains', title: 'Train Switcher', one: 'train', many: 'trains', place: 'station', places: 'stations', countIcon: '🚉',
@@ -240,6 +244,10 @@ const THEMES = {
             crashEmoji: '🌀', crashTitle: 'Whoops!', oops: 'or it spins out', look: 'sky',
             page: ['#101a3d', '#1f2d60', '#f2f5ff', '#aab7e2'], ground: ['#101c4a', '#2c4390'],
             path: ['#ffffff', '#ffffff', '#ffffff'], sw: ['#ffffff', '#c4d0ea', '#14235a'] },
+  cars:   { emoji: '🚗', label: 'Cars', title: 'Car Switcher', one: 'car', many: 'cars', place: 'garage', places: 'garages', countIcon: '🅿️',
+            crashEmoji: '💥', crashTitle: 'Bump!', oops: 'or it bumps', look: 'road',
+            page: ['#1f2a33', '#2c3a46', '#f2f6fa', '#a9b8c6'], ground: ['#5f9c4a', '#4c853b'],
+            path: ['#d5d8dc', '#4a4f57', '#ffffff'], sw: ['#ffffff', '#3a3f47', '#2a2e35'] },
 };
 // Switch controls (picked in Settings, saved on the device). Every mode moves the same switches; only the way you move them changes.
 //   rail: tap the branch of track you want; the switch swings onto it.   lever: push the lever beside each switch, like a toy train set.
@@ -864,6 +872,49 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
         ctx.fillStyle = '#ffffff'; circle(x + 9.5 * s, y + h - 10 * s, 4.5 * s); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,.45)'; circle(x + 9.5 * s, y + h - 10 * s, 2 * s); ctx.fill();   // control tower
       },
     },
+    road: {
+      burst: '255,170,60',
+      ground() { ground();
+        let n = 0; decor.forEach(o => { if (o.clear < 40) return;
+          if (o.k < .5 && n < 14) { n++; const r = 8 + o.k * 12;   // round bushes
+            ctx.fillStyle = 'rgba(0,0,0,.16)'; circle(o.x + 3, o.y + 4, r); ctx.fill();
+            ctx.fillStyle = '#3e7a30'; circle(o.x, o.y, r); ctx.fill(); ctx.fillStyle = '#5a9a44'; circle(o.x - r * .3, o.y - r * .3, r * .5); ctx.fill(); }
+          else if (o.k > .8) { ctx.fillStyle = o.k > .9 ? '#fff6a8' : '#ffffff'; circle(o.x, o.y, 2.2); ctx.fill(); } }); },   // little flowers
+      paths(E) {
+        ctx.lineCap = 'round'; ctx.strokeStyle = T.path[0]; ctx.lineWidth = 40; E.forEach(e => line(e.A.x, e.A.y, e.B.x, e.B.y));   // kerbs
+        ctx.strokeStyle = T.path[1]; ctx.lineWidth = 33; E.forEach(e => line(e.A.x, e.A.y, e.B.x, e.B.y));                            // tarmac
+        ctx.lineCap = 'butt'; ctx.strokeStyle = T.path[2]; ctx.lineWidth = 3; ctx.globalAlpha = .85; ctx.setLineDash([12, 12]);       // dashed centre line
+        E.forEach(e => { const a = along(e, 22), b = along(e, e.L - 22); if (e.L > 50) line(a.x, a.y, b.x, b.y); });
+        ctx.setLineDash([]); ctx.globalAlpha = 1;
+      },
+      closed(e, g) {
+        const a = along(e, g), b = along(e, e.L); ctx.lineCap = 'butt'; ctx.strokeStyle = 'rgba(10,14,18,.5)'; ctx.lineWidth = 34; line(a.x, a.y, b.x, b.y);
+        [-11, 0, 11].forEach(o => { const p = along(e, g + 6, o);   // three traffic cones across the road
+          ctx.fillStyle = '#ff7a1a'; ctx.beginPath(); ctx.moveTo(p.x, p.y - 8); ctx.lineTo(p.x + 5.5, p.y + 6); ctx.lineTo(p.x - 5.5, p.y + 6); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = '#ffffff'; ctx.fillRect(p.x - 3.2, p.y - 1, 6.4, 2.6); });
+      },
+      rim(r) {   // a thin white ring inside the rim, like a road sign
+        ctx.strokeStyle = 'rgba(58,63,71,.35)'; ctx.lineWidth = 2; circle(0, 0, r * .8); ctx.stroke();
+      },
+      vehicle(t) { body(t, () => {   // a little car seen from above, nose to the right
+        ctx.fillStyle = 'rgba(0,0,0,.25)'; roundRect(-27, -12, 56, 26, 9); ctx.fill();                          // shadow
+        ctx.fillStyle = '#1d1d1d'; [[-17, -14], [-17, 10], [12, -14], [12, 10]].forEach(([x, y]) => { roundRect(x, y, 11, 4, 2); ctx.fill(); });   // wheels
+        ctx.lineJoin = 'round'; ctx.fillStyle = t.colour; roundRect(-27, -12, 55, 24, 9); ctx.fill();
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5; ctx.stroke();
+        ctx.fillStyle = 'rgba(15,25,35,.75)'; roundRect(3, -9, 9, 18, 3); ctx.fill(); roundRect(-19, -8.5, 6, 17, 3); ctx.fill();   // windscreens
+        ctx.fillStyle = 'rgba(255,255,255,.28)'; roundRect(-12, -9, 14, 18, 3); ctx.fill();                       // roof
+        ctx.fillStyle = '#fff6b0'; circle(26, -7, 2.6); ctx.fill(); circle(26, 7, 2.6); ctx.fill();                  // headlights
+      }); },
+      home(n, p, s) {   // a garage: the road runs in through the open door at the top
+        const w = 62 * s, h = 44 * s, x = p.x - w / 2, y = p.y - 14 * s, d = 18 * s;
+        ctx.fillStyle = 'rgba(0,0,0,.25)'; roundRect(x + 2, y + 4, w, h, 8 * s); ctx.fill();
+        ctx.fillStyle = n.colour; roundRect(x, y, w, h, 8 * s); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,.3)'; ctx.fillRect(x + 6 * s, y + h * .55, w - 12 * s, 3 * s);           // roof ridge
+        ctx.fillStyle = '#3a3f47'; roundRect(p.x - d, y - 2 * s, d * 2, 20 * s, 4 * s); ctx.fill();               // the open door
+        ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1.5; for (let k = 1; k < 4; k++) line(p.x - d + 3, y - 2 * s + k * 5 * s, p.x + d - 3, y - 2 * s + k * 5 * s);
+        ctx.fillStyle = '#ffffff'; ctx.font = `900 ${15 * s}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('P', p.x, y + h * .78);
+      },
+    },
   };
 
   const ease = k => k * k * (3 - 2 * k);
@@ -875,6 +926,15 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
     const len = pointsLen(s) * (1 + s.pulse * .1), ang = branchAngle(s, 0) + (branchAngle(s, 1) - branchAngle(s, 0)) * ease(s.anim);
     if (s.pulse > 0) { ctx.strokeStyle = `rgba(255,255,255,${s.pulse * .9})`; ctx.lineWidth = 5; circle(x, y, 24 + (1 - s.pulse) * 30); ctx.stroke(); }
     ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+    if (T.look === 'road') {   // roads: the moving piece is a big painted arrow on the tarmac (a white block would look like a car)
+      const shape = () => { ctx.beginPath(); ctx.moveTo(-10, -7); ctx.lineTo(len - 8, -7); ctx.lineTo(len - 8, -15); ctx.lineTo(len + 12, 0); ctx.lineTo(len - 8, 15); ctx.lineTo(len - 8, 7); ctx.lineTo(-10, 7); ctx.closePath(); };
+      ctx.lineJoin = 'round'; ctx.save(); ctx.translate(0, 4); shape(); ctx.fillStyle = 'rgba(0,0,0,.32)'; ctx.fill(); ctx.restore();
+      shape(); ctx.fillStyle = busy ? '#8a9199' : T.sw[0]; ctx.fill(); ctx.strokeStyle = busy ? '#ff5d5d' : T.sw[1]; ctx.lineWidth = 3; ctx.stroke();
+      ctx.restore();
+      ctx.fillStyle = busy ? '#ff5d5d' : T.sw[1]; circle(x, y, 10); ctx.fill(); ctx.fillStyle = '#ffffff'; circle(x, y, 4); ctx.fill();
+      if (busy && (s.shake > 0 || Math.sin(clock * 10) > 0)) { ctx.strokeStyle = 'rgba(255,93,93,.55)'; ctx.lineWidth = 4; circle(x, y, len * .7); ctx.stroke(); }
+      return;
+    }
     ctx.fillStyle = 'rgba(0,0,0,.32)'; roundRect(-11, -11 + 4, len + 13, 22, 9); ctx.fill();                       // shadow
     ctx.fillStyle = busy ? '#3b4046' : T.sw[0]; roundRect(-11, -11, len + 13, 22, 9); ctx.fill();               // the moving piece
     ctx.strokeStyle = busy ? '#ff5d5d' : T.sw[1]; ctx.lineWidth = 3.5; ctx.stroke();

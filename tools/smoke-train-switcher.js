@@ -6,7 +6,7 @@ const { chromium, devices } = require('playwright');
 const path = require('path'), fs = require('fs'), os = require('os');
 const FILE = path.join(__dirname, '..', 'games', 'train-switcher', 'train-switcher.html');
 const SHOT = path.resolve(process.env.SHOT_DIR || path.join(os.tmpdir(), 'train-switcher-shots')) + path.sep;
-const REQUIRED = ['trains', 'boats', 'planes'];
+const REQUIRED = ['trains', 'boats', 'planes', 'cars'];
 const PHONES = {
   'iPhone 13': { ...devices['iPhone 13'], deviceScaleFactor: 2 },
   'iPhone SE': { ...devices['iPhone SE'], deviceScaleFactor: 2 },
