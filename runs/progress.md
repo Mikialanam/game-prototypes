@@ -1,5 +1,34 @@
 # Run progress
 
+Run started 2026-11-23. Brief: **Train Switcher: a Cars theme, and different types of each vehicle.** Add 🚗 Cars next to Trains, Boats and Planes (roads, junctions, garages). Give every theme a choice of vehicle types (e.g. steam train / bullet train / freight train; speedboat / sailboat / tugboat; jet / propeller plane / helicopter; car / bus / truck), plus a "Mix" that sends a different type each time. Same game underneath: only looks and words change.
+
+Working branch: `claude/serene-brahmagupta-k4uwiz`. Publish to the Pages branch `claude/intelligent-lamport-sbfavc` only when Miki says so.
+
+Stay on scope: only these two Train Switcher additions.
+
+## Plan (this run)
+
+| # | Step | Estimate | Status |
+|---|---|---|---|
+| 1 | Resume: read progress and commits; write this plan | 5 min | done |
+| 2 | Cars theme: road look (asphalt, centre line, kerbs), car drawing, garages, words, page colours; theme picker fits four | 30 min | |
+| 3 | Vehicle types: a TYPES table per theme, a "Type" picker (theme card and start card), saved per theme, "Mix" option | 25 min | |
+| 4 | Draw the new types for trains and boats | 25 min | |
+| 5 | Draw the new types for planes and cars | 25 min | |
+| 6 | Tests: four themes and every type in the smoke tests; rerun all Train Switcher tests; check screenshots on small phones | 30 min | |
+| 7 | README, home page line, handover | 10 min | |
+
+## Later (not this run)
+- Playtest with the same child (table in RATING-SHEET.md).
+- Publish once Miki says so.
+
+## Log
+- Resumed: previous run (Kid waits) complete and live; working tree clean.
+
+---
+
+# Previous run: Train Switcher, Kid waits
+
 Run started 2026-11-22. Brief: **Train Switcher, Kid mode waits at switches.** In Kid difficulty, a vehicle stops just before each switch and waits until the player picks a direction (tap/click on that switch, in whatever control mode). No timer, no pressure. The waiting switch is made obvious (glow / pulsing arrow). Adult and Expert, and the Slow / Normal / Fast speeds, behave as before.
 
 Working branch: session branch `claude/serene-brahmagupta-k4uwiz` (fast-forwarded to the Pages branch's latest, 96a2f37). Not pushed to the Pages branch without Miki's go-ahead.
