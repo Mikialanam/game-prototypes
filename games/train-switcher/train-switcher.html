@@ -783,7 +783,107 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
     paint(); ctx.restore();
   }
 
-  // ---------- the three looks: same game, different drawings ----------
+  // ---------- vehicle types (VEHICLE_TYPES): every drawing is seen from above, nose to the right (+x), about the same size ----------
+  // Trains are drawn one car at a time (c = 0 is the engine), each car centred on its own spot on the track, 22px apart.
+  function trainCar(k, c, colour) {
+    ctx.lineJoin = 'round';
+    if (k === 'bullet') {   // a sleek high-speed train: long cars that touch, a pointed white nose, a dark window band
+      if (c === 0) { ctx.beginPath(); ctx.moveTo(-11, -8.5); ctx.lineTo(4, -8.5); ctx.quadraticCurveTo(18, -7, 20, 0); ctx.quadraticCurveTo(18, 7, 4, 8.5); ctx.lineTo(-11, 8.5); ctx.closePath(); }
+      else roundRect(-11.5, -8.5, 23, 17, 3);
+      ctx.fillStyle = colour; ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.4)'; ctx.lineWidth = 1.8; ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillRect(-11, -2, c === 0 ? 14 : 22, 4);                    // white stripe along the roof
+      if (c === 0) { ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(8, -7.5); ctx.quadraticCurveTo(18, -6, 19.5, 0); ctx.quadraticCurveTo(18, 6, 8, 7.5); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#16202c'; ctx.beginPath(); ctx.ellipse(9, 0, 3, 6, 0, 0, Math.PI * 2); ctx.fill(); }   // nose and windscreen
+      return;
+    }
+    if (k === 'freight') {   // a boxy diesel engine, then open wagons carrying logs and coal
+      if (c === 0) { ctx.fillStyle = colour; roundRect(-10, -9, 21, 18, 3); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = 'rgba(0,0,0,.35)'; roundRect(-9, -7, 8, 14, 2); ctx.fill();                                 // the cab
+        ctx.fillStyle = 'rgba(255,255,255,.4)'; for (let x = 1; x < 9; x += 3.5) ctx.fillRect(x, -6, 1.6, 12);    // radiator grille
+        ctx.fillStyle = '#ffe680'; circle(10, -5, 2); ctx.fill(); circle(10, 5, 2); ctx.fill(); return; }
+      ctx.fillStyle = colour; roundRect(-10, -9, 20, 18, 2); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.fillRect(-7, -6, 14, 12);                                                // inside the wagon
+      if (c % 2) { ctx.fillStyle = '#9a6a3c'; [-3.5, 0, 3.5].forEach(y => { roundRect(-7, y - 1.6, 14, 3.2, 1.6); ctx.fill(); }); }   // logs
+      else { ctx.fillStyle = '#2b2b2b'; [[-4, -2], [0, 2], [4, -2], [-3, 3], [3, 3], [0, -3]].forEach(([x, y]) => { circle(x, y, 2.4); ctx.fill(); }); }   // coal
+      return;
+    }
+    // steam (the original): little cars with windows; the engine has a lamp, a chimney, and puffs of smoke
+    ctx.fillStyle = colour; roundRect(-10, -9, 20, 18, 4); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.lineWidth = 2; ctx.stroke();
+    if (c === 0) { ctx.fillStyle = '#fff'; circle(6, 0, 3.5); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,.45)'; circle(-3, 0, 3); ctx.fill();
+      for (let i = 0; i < 3; i++) { const f = (clock * 1.2 + i / 3) % 1; ctx.fillStyle = `rgba(235,240,245,${(1 - f) * .55})`; circle(-3 - f * 26, Math.sin(f * 5 + i) * 3, 3 + f * 6); ctx.fill(); } }
+    else { ctx.fillStyle = 'rgba(255,255,255,.35)'; roundRect(-6, -4.5, 12, 9, 2); ctx.fill(); }
+  }
+  // Boats
+  function sailBoat(t) {   // a sailing boat: a slim pointed hull, a mast and a white sail swinging gently to one side
+    const sway = Math.sin(clock * 1.6 + t.d * .02) * .12;
+    ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; line(-29, -4, -46, -8); line(-29, 4, -46, 8);   // the wake
+    ctx.beginPath(); ctx.moveTo(-28, -8); ctx.lineTo(6, -10); ctx.quadraticCurveTo(26, -8, 33, 0); ctx.quadraticCurveTo(26, 8, 6, 10); ctx.lineTo(-28, 8); ctx.closePath();
+    ctx.lineJoin = 'round'; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3.5; ctx.stroke(); ctx.fillStyle = t.colour; ctx.fill();
+    ctx.fillStyle = 'rgba(120,80,40,.5)'; roundRect(-24, -5, 40, 10, 4); ctx.fill();                                    // wooden deck
+    ctx.save(); ctx.translate(6, 0); ctx.rotate(.35 + sway);                                                            // the sail and its boom
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-34, 0); ctx.quadraticCurveTo(-18, -17, 0, 0); ctx.closePath();
+    ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.strokeStyle = '#6b4a2b'; ctx.lineWidth = 2.5; line(0, 0, -34, 0); ctx.restore();
+    ctx.fillStyle = '#6b4a2b'; circle(6, 0, 3); ctx.fill();                                                             // mast
+  }
+  function ferry(t) {   // a ferry: a wide hull in the colour, white decks with rows of windows, a funnel
+    ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 3; ctx.lineCap = 'round'; line(-31, -7, -50, -12); line(-31, 7, -50, 12);
+    ctx.beginPath(); ctx.moveTo(-31, -12); ctx.lineTo(16, -12); ctx.quadraticCurveTo(31, -11, 34, 0); ctx.quadraticCurveTo(31, 11, 16, 12); ctx.lineTo(-31, 12); ctx.quadraticCurveTo(-34, 0, -31, -12); ctx.closePath();
+    ctx.lineJoin = 'round'; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.stroke(); ctx.fillStyle = t.colour; ctx.fill();
+    ctx.fillStyle = '#ffffff'; roundRect(-25, -7.5, 38, 15, 4); ctx.fill();                                            // upper deck
+    ctx.fillStyle = '#26323e'; for (let x = -21; x < 10; x += 6) { ctx.fillRect(x, -6, 3, 2.6); ctx.fillRect(x, 3.4, 3, 2.6); }   // windows
+    ctx.fillStyle = t.colour; roundRect(-12, -3.5, 9, 7, 2.5); ctx.fill(); ctx.fillStyle = '#1d1d1d'; roundRect(-11, -2, 7, 4, 2); ctx.fill();   // funnel
+    ctx.fillStyle = '#26323e'; roundRect(15, -5, 4, 10, 2); ctx.fill();                                                 // bridge window
+  }
+  // Planes
+  function propPlane(t) {   // a little propeller plane: straight wings, a spinning propeller on the nose
+    const shapes = [
+      () => roundRect(-4, -27, 11, 54, 4),                                                                              // wings
+      () => roundRect(-30, -11, 7, 22, 3),                                                                              // tail
+      () => { ctx.beginPath(); ctx.ellipse(-3, 0, 26, 6, 0, 0, Math.PI * 2); },                                         // body
+    ];
+    ctx.lineJoin = 'round'; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3.5; shapes.forEach(s => { s(); ctx.stroke(); });
+    ctx.fillStyle = t.colour; shapes.forEach(s => { s(); ctx.fill(); });
+    ctx.fillStyle = 'rgba(0,0,0,.18)'; roundRect(-4, 4, 11, 23, 4); ctx.fill();
+    ctx.fillStyle = '#0d1a3a'; ctx.beginPath(); ctx.ellipse(9, 0, 4.5, 3, 0, 0, Math.PI * 2); ctx.fill();               // cockpit
+    ctx.fillStyle = 'rgba(255,255,255,.25)'; circle(25, 0, 11); ctx.fill();                                            // the blur of the propeller
+    ctx.save(); ctx.translate(25, 0); ctx.scale(.35, 1); ctx.rotate(clock * 25); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3.5; ctx.lineCap = 'round'; line(0, -11, 0, 11); ctx.restore();
+    ctx.fillStyle = '#ffffff'; circle(24, 0, 2.6); ctx.fill();
+  }
+  function helicopter(t) {   // a helicopter: a round cabin, a tail with a little rotor, and big blades whirling on top
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 8; line(-6, 0, -30, 0); ctx.strokeStyle = t.colour; ctx.lineWidth = 4.5; line(-6, 0, -30, 0);   // tail boom
+    ctx.save(); ctx.translate(-30, 0); ctx.rotate(clock * 30); ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 2.5; line(-7, 0, 7, 0); ctx.restore();   // tail rotor
+    ctx.beginPath(); ctx.ellipse(4, 0, 15, 11, 0, 0, Math.PI * 2); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3.5; ctx.stroke(); ctx.fillStyle = t.colour; ctx.fill();   // cabin
+    ctx.fillStyle = '#0d1a3a'; ctx.beginPath(); ctx.ellipse(13, 0, 5, 7, 0, 0, Math.PI * 2); ctx.fill();                  // windscreen
+    ctx.fillStyle = 'rgba(255,255,255,.09)'; circle(3, 0, 29); ctx.fill();                                              // the blur of the blades
+    ctx.save(); ctx.translate(3, 0); ctx.rotate(clock * 14); ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 3;
+    line(-29, 0, 29, 0); line(0, -29, 0, 29); ctx.restore();
+    ctx.fillStyle = '#1d1d1d'; circle(3, 0, 3.5); ctx.fill();
+  }
+  // Cars
+  function bus(t) {   // a long bus: windows down both sides, a big windscreen at the front
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; roundRect(-32, -12, 64, 26, 6); ctx.fill();
+    ctx.fillStyle = '#1d1d1d'; [[-24, -14], [-24, 10], [17, -14], [17, 10]].forEach(([x, y]) => { roundRect(x, y, 10, 4, 2); ctx.fill(); });
+    ctx.lineJoin = 'round'; ctx.fillStyle = t.colour; roundRect(-32, -12, 64, 24, 6); ctx.fill(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.fillStyle = 'rgba(15,25,35,.7)'; for (let x = -27; x < 16; x += 8) { ctx.fillRect(x, -10, 6, 3); ctx.fillRect(x, 7, 6, 3); }   // side windows
+    ctx.fillStyle = 'rgba(255,255,255,.3)'; roundRect(-27, -5, 44, 10, 3); ctx.fill();                                  // roof
+    ctx.fillStyle = 'rgba(15,25,35,.8)'; roundRect(22, -10, 6, 20, 2); ctx.fill();                                      // windscreen
+    ctx.fillStyle = '#fff6b0'; circle(30.5, -8, 2.3); ctx.fill(); circle(30.5, 8, 2.3); ctx.fill();
+  }
+  function truck(t) {   // a lorry: a cab at the front and a big box behind it, both in the colour
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; roundRect(-32, -12, 63, 26, 5); ctx.fill();
+    ctx.fillStyle = '#1d1d1d'; [[-27, -14], [-27, 10], [-14, -14], [-14, 10], [18, -14], [18, 10]].forEach(([x, y]) => { roundRect(x, y, 9, 4, 2); ctx.fill(); });
+    ctx.lineJoin = 'round'; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5;
+    ctx.fillStyle = t.colour; roundRect(-32, -12, 44, 24, 3); ctx.fill(); ctx.stroke();                                  // the box
+    ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(-29, -2, 38, 4);                                              // stripe on the roof
+    ctx.fillStyle = t.colour; roundRect(14, -11, 17, 22, 5); ctx.fill(); ctx.stroke();                                  // the cab
+    ctx.fillStyle = 'rgba(15,25,35,.75)'; roundRect(23, -9, 5, 18, 2); ctx.fill();                                      // windscreen
+    ctx.fillStyle = '#fff6b0'; circle(30, -8, 2.3); ctx.fill(); circle(30, 8, 2.3); ctx.fill();
+  }
+
+  // ---------- the looks: same game, different drawings ----------
   // ground(): background.  paths(E): every stretch of route (E[n].on = false for the closed side of a switch).
   // closed(e, g): the "off" mark on a closed branch, g px out from the switch.  rim(r): decoration on the switch button.
   // vehicle(t), home(n, p, s): the vehicle and its destination.  burst: r,g,b of the crash puff.
@@ -809,14 +909,12 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
       },
       rim() {},
       vehicle(t) {
+        const k = kindOf(t);
         for (let c = CAR_COUNT - 1; c >= 0; c--) {
           const p = pointAt(t, t.d - c * CAR_SPACING);
           ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.ang);
           if (crashAt) ctx.rotate(Math.sin(crashAt.t * 30 + c) * .3);
-          ctx.fillStyle = t.colour; roundRect(-10, -9, 20, 18, 4); ctx.fill();
-          ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.lineWidth = 2; ctx.stroke();
-          if (c === 0) { ctx.fillStyle = '#fff'; circle(6, 0, 3.5); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,.45)'; circle(-3, 0, 3); ctx.fill(); }
-          else { ctx.fillStyle = 'rgba(255,255,255,.35)'; roundRect(-6, -4.5, 12, 9, 2); ctx.fill(); }
+          trainCar(k, c, t.colour);
           ctx.restore();
         }
       },
@@ -851,7 +949,8 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
         ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(5, r * .13); ctx.lineCap = 'butt';
         for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(0, 0, r - ctx.lineWidth / 2, i * Math.PI / 2 + .45, i * Math.PI / 2 + 1.12); ctx.stroke(); }
       },
-      vehicle(t) { body(t, () => {
+      vehicle(t) { const k = kindOf(t); body(t, () => {
+        if (k === 'sail') return sailBoat(t); if (k === 'ferry') return ferry(t);
         const wob = Math.sin(clock * 9 + t.d * .05) * 1.5;       // the wake
         ctx.lineCap = 'round'; ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(255,255,255,.5)';
         ctx.beginPath(); ctx.moveTo(-31, -6); ctx.lineTo(-52, -11 + wob); ctx.moveTo(-31, 6); ctx.lineTo(-52, 11 - wob); ctx.stroke();
@@ -894,7 +993,8 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
         ctx.strokeStyle = T.sw[2]; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
         for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6, c = Math.cos(a), s = Math.sin(a); line(c * (r - 3), s * (r - 3), c * (r - r * .12), s * (r - r * .12)); }
       },
-      vehicle(t) { body(t, () => {
+      vehicle(t) { const k = kindOf(t); body(t, () => {
+        if (k === 'prop') return propPlane(t); if (k === 'heli') return helicopter(t);
         const trail = ctx.createLinearGradient(-30, 0, -66, 0); trail.addColorStop(0, 'rgba(255,255,255,.55)'); trail.addColorStop(1, 'rgba(255,255,255,0)');
         ctx.strokeStyle = trail; ctx.lineWidth = 5; ctx.lineCap = 'round'; line(-32, 0, -66, 0);
         const shapes = [
@@ -939,7 +1039,8 @@ const SOUND_ON               = true;   // false = no sound at all (players can a
       rim(r) {   // a thin white ring inside the rim, like a road sign
         ctx.strokeStyle = 'rgba(58,63,71,.35)'; ctx.lineWidth = 2; circle(0, 0, r * .8); ctx.stroke();
       },
-      vehicle(t) { body(t, () => {   // a little car seen from above, nose to the right
+      vehicle(t) { const k = kindOf(t); body(t, () => {   // a little car seen from above, nose to the right
+        if (k === 'bus') return bus(t); if (k === 'truck') return truck(t);
         ctx.fillStyle = 'rgba(0,0,0,.25)'; roundRect(-27, -12, 56, 26, 9); ctx.fill();                          // shadow
         ctx.fillStyle = '#1d1d1d'; [[-17, -14], [-17, 10], [12, -14], [12, 10]].forEach(([x, y]) => { roundRect(x, y, 11, 4, 2); ctx.fill(); });   // wheels
         ctx.lineJoin = 'round'; ctx.fillStyle = t.colour; roundRect(-27, -12, 55, 24, 9); ctx.fill();
