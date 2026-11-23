@@ -15,8 +15,8 @@ Stay on scope: only these two Train Switcher additions.
 | 3 | Vehicle types: a TYPES table per theme, a "Type" picker (theme card and start card), saved per theme, "Mix" option | 25 min | done |
 | 4 | Draw the new types for trains and boats | 25 min | done |
 | 5 | Draw the new types for planes and cars | 25 min | done |
-| 6 | Tests: four themes and every type in the smoke tests; rerun all Train Switcher tests; check screenshots on small phones | 30 min | |
-| 7 | README, home page line, handover | 10 min | |
+| 6 | Tests: four themes and every type in the smoke tests; rerun all Train Switcher tests; check screenshots on small phones | 30 min | done |
+| 7 | README, home page line, handover | 10 min | done |
 
 ## Later (not this run)
 - Playtest with the same child (table in RATING-SHEET.md).
@@ -27,6 +27,14 @@ Stay on scope: only these two Train Switcher additions.
 - Cars theme done (`cars` in `THEMES`, look `road`): grey roads with kerbs and a dashed centre line, bushes and flowers on grass, cars seen from above, garages with an open door and a P, traffic cones on a closed road (Arrow mode), "Bump!" if crashed. In Tap-the-rail and Lever modes the moving switch is a painted road arrow (a white block looked like a white car). Theme picker is four across; start card still fits on iPhone SE. Test theme list includes cars. Next: vehicle types.
 - Vehicle types: `VEHICLE_TYPES` (three per theme) and `MIX_TYPE`. A "Which train / boat / plane / car?" row of four buttons under the theme picker on the start card and the theme card; it rebuilds when the theme changes; choice saved per theme (`types`). In Mix each vehicle keeps its own random type. Start card still fits on iPhone SE. Drawings still the default for every type. Next: draw the train and boat types.
 - All types drawn, same size as before so the game plays the same: trains Steam (original, now with a chimney puffing smoke), Bullet (long touching cars, white pointed nose), Freight (diesel engine, wagons of logs and coal); boats Motor (original), Sail (slim hull, swinging sail), Ferry (wide hull, white decks with windows, funnel); planes Jet (original), Prop (straight wings, spinning propeller), Heli (round cabin, whirling blades, tail rotor); cars Car, Bus, Truck. Screenshots checked on level 4. Next: tests.
+- Tests: `smoke-train-switcher.js` now plays all four themes and has a vehicle-types section (type row per theme on the start card, each type really drawn, saved per theme after reload, another theme's type refused, Mix brings different types): 103/103. The extra row pushed the Kid start card 18px over on iPhone SE; tightened the pickers on screens under 620px tall, every button still at least 48px. `smoke-train-controls.js` 91/91, `smoke-train-wait.js` 47/47, `smoke-test-2.js train-switcher` wins 1–4, `smoke-test.js` passes. README and home page line updated.
+
+## Handover (Cars and vehicle types)
+**Done:** 🚗 Cars theme (roads, road-arrow junctions, garages). Three vehicle types per theme plus Mix, picked under the theme, saved per theme. All tests pass. On `claude/serene-brahmagupta-k4uwiz`.
+
+**Not done:** not published to the Pages branch (waiting for Miki's go-ahead).
+
+**Choices to revisit:** Steam trains now puff smoke (the original train otherwise unchanged); short labels on the type buttons (Motor, Sail, Prop, Heli) so four fit across a small phone, full names read out by screen readers; the iPhone SE start card is full, so another picker row would need a different layout.
 
 ---
 

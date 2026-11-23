@@ -17,7 +17,7 @@ const PHONES = {
   fs.mkdirSync(SHOT, { recursive: true });
   const browser = await chromium.launch();
   const errs = [], failed = []; let passed = 0;
-  const summary = { themes: {}, phones: {}, tapZone: {}, busyFlip: {}, pause: {} };
+  const summary = { themes: {}, phones: {}, tapZone: {}, busyFlip: {}, pause: {}, types: {} };
   const check = (name, ok, detail) => { if (ok) passed++; else failed.push(detail === undefined ? name : `${name} (${JSON.stringify(detail)})`); return ok; };
 
   let openCount = 0;
@@ -259,11 +259,51 @@ const PHONES = {
     const migrated = await page.evaluate(() => { __trains.setDifficulty('adult'); return document.getElementById('bestPill').textContent; });
     check('an old saved best shows under Adult', /5/.test(migrated), migrated);
     const rows = await page.evaluate(() => ({ themes: document.querySelectorAll('#startOv .picker .pick').length, diffs: document.querySelectorAll('#startOv .dpicker:not(.spicker) .pick').length, speeds: document.querySelectorAll('#startOv .spicker .pick').length }));
-    check('start card has theme, difficulty and speed pickers', rows.themes === 3 && rows.diffs === 3 && rows.speeds === 3, rows);
+    check('start card has theme (4), difficulty and speed pickers', rows.themes === 4 && rows.diffs === 3 && rows.speeds === 3, rows);
     await ctx.close();
   }
 
-  await Promise.all([...REQUIRED.map(playTheme), phone('360x640', '360x640', true), phone('iPhone SE', 'iphone-se', true), tapZone(), crashRule()]);
+  // ---------- 5. vehicle types: every theme's types and Mix on the start card, saved per theme, each one plays, Mix varies ----------
+  async function types(phoneName) {
+    const { page, ctx } = await open(phoneName), out = summary.types[phoneName] = {};
+    for (const theme of REQUIRED) {
+      await page.locator(`#startOv .pick[data-theme="${theme}"]`).tap(); await page.waitForTimeout(60);
+      const row = await page.evaluate(() => ({ label: document.querySelector('#startOv .tpicker').previousElementSibling.textContent,
+        buttons: [...document.querySelectorAll('#startOv .tpicker .pick')].map(b => ({ id: b.dataset.type, on: b.classList.contains('on'), h: Math.round(b.getBoundingClientRect().height) })),
+        list: __trains.types, one: THEMES[__trains.theme].one }));
+      const ids = row.buttons.map(b => b.id);
+      check(`${phoneName}, ${theme}: start card shows "Which ${row.one}?" with its 3 types and Mix, first one lit, each at least 44px`,
+        row.label.toLowerCase().includes(row.one) && ids.length === 4 && ids[3] === 'mix' && ids.join() === row.list.join() && row.buttons[0].on && row.buttons.every(b => b.h >= 44), row);
+      const sc = await card(page, '#startOv'); check(`${phoneName}, ${theme}: start card with the type row fits the screen`, sc.fits && !sc.smallButtons.length, sc);
+      // each type: pick it, play a few seconds of level 1 (Adult, so nothing waits), no errors, the vehicles really use it
+      out[theme] = {};
+      for (const id of ids.slice(1, 3)) {
+        await page.locator(`#startOv .pick[data-type="${id}"]`).tap();
+        await page.evaluate(() => { __trains.setDifficulty('adult'); __trains.start(1); });
+        await page.waitForFunction(() => __trains.kinds.length > 0, null, { timeout: 8000 }); await page.waitForTimeout(1200);
+        const k = await page.evaluate(() => __trains.kinds); out[theme][id] = k;
+        await page.screenshot({ path: SHOT + `tsw-type-${theme}-${id}.png` });
+        check(`${phoneName}, ${theme}: ${id} vehicles are drawn as ${id}`, k.length && k.every(x => x === id), k);
+        await page.evaluate(() => { __trains.setDifficulty('kid'); document.getElementById('startOv').classList.add('show'); });
+      }
+    }
+    // saved per theme: the last pick in each theme comes back after a reload; a type from another theme is refused
+    await page.reload(); await page.waitForTimeout(150);
+    const saved = await page.evaluate(t => t.map(th => (__trains.setTheme(th), __trains.type)), REQUIRED);
+    const refused = await page.evaluate(() => (__trains.setTheme('trains'), __trains.setType('heli')));
+    out.saved = saved;
+    check(`${phoneName}: each theme remembers its own vehicle type, and refuses another theme's`, saved.join() === 'freight,ferry,heli,truck' && refused === false, { saved, refused });
+    // Mix: a busy level brings a mix of types
+    await page.evaluate(() => { __trains.setTheme('cars'); __trains.setType('mix'); __trains.setDifficulty('expert'); __trains.start(7); });
+    const seen = new Set();
+    for (let i = 0; i < 60 && seen.size < 2; i++) { (await page.evaluate(() => __trains.kinds)).forEach(k => seen.add(k)); await page.waitForTimeout(250); }
+    out.mix = [...seen];
+    check(`${phoneName}: Mix sends different types`, seen.size >= 2 && [...seen].every(k => ['car', 'bus', 'truck'].includes(k)), out.mix);
+    await page.screenshot({ path: SHOT + `tsw-type-mix.png` });
+    await ctx.close();
+  }
+
+  await Promise.all([types('iPhone SE'), ...REQUIRED.map(playTheme), phone('360x640', '360x640', true), phone('iPhone SE', 'iphone-se', true), tapZone(), crashRule()]);
   check('no console errors', !errs.length, errs);
   const result = { ...summary, checks: { passed, failed }, errs, screenshots: SHOT, ok: !failed.length && !errs.length };
   console.log(JSON.stringify(result, null, 2));
