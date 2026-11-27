@@ -13,7 +13,7 @@ iPad touch friendly, no text, no money/score/timers, autosave in localStorage.
 3. [x] Trains (~30 min): picture menu with 5 trains (commuter, subway, streetcar, freight, steam),
    placing, driving along tracks, switches, dead-end reversing, gentle collision waiting.
 4. [x] Buildings (~25 min): yards (sheds), stations (people), bridges, tunnels, trees, houses.
-5. [ ] Day/night (~30 min): cycle, trains route to nearest yard and park, lights dim,
+5. [x] Day/night (~30 min): cycle, trains route to nearest yard and park, lights dim,
    lullaby; morning wake-up toot. Sun/moon button.
 6. [ ] Kid polish (~30 min): tap train = honk + light wave, tap station = people hop on,
    undo, clear with confirm, Web Audio sounds, iPad touch tuning, Playwright smoke test.
@@ -27,8 +27,10 @@ iPad touch friendly, no text, no money/score/timers, autosave in localStorage.
 
 - Step 4: yards (long red sheds over trains), stations (platform + people, trains stop and people board), bridge tool, tunnel hills over trains, trees, houses; grid enlarged to 16x11 for bigger touch targets
 
+- Step 5: 150 s day/night cycle with dusk tint, glowing houses/stations/fireflies, trains route (BFS) to nearest yard, slide into the shed, Zzz, lullaby; dawn wake-up with toots; sun/moon button; trains nap on the track if no yard is reachable
+
 ### Next
-- Step 5: day/night cycle and trains going to sleep
+- Step 6: clear with confirm, polish, full smoke test
 
 ### Blocked
 - Nothing

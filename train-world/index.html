@@ -81,6 +81,7 @@ const DY = { 1: -1, 2: 0, 4: 1, 8: 0 };
 const OPP = { 1: 4, 2: 8, 4: 1, 8: 2 };
 const SAVE_KEY = 'ayman-trains-v1';
 const TAU = Math.PI * 2;
+const ICONS = {}; // toolbar pictures, filled in below
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -596,6 +597,7 @@ function frame(now) {
 function update(dt) {
   updateTrains(dt);
   updateStations(dt);
+  advanceTime(dt);
   saveTimer += dt;
   if (saveTimer > 4) { saveTimer = 0; save(); }
 }
@@ -612,6 +614,8 @@ function draw() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   drawStationPeople();
   drawPuffs();
+  drawNight();
+  drawZzz();
   drawSparkles();
 }
 
@@ -644,7 +648,7 @@ function makeTrain(type) {
   const cars = spec.cars.map((kind, i) => ({ kind, flip: kind === 'cab' && i === spec.cars.length - 1 && i > 0 }));
   return {
     id: world.nextId++, type, segs: [], h: 0, cars, v: 0, state: 'run',
-    wait: 0, blocked: 0, stuck: 0, ghost: 0, honkT: 0, parkD: 0, out: Infinity, lastStop: -1, smoke: 0, wakeDelay: 0,
+    wait: 0, blocked: 0, stuck: 0, lamp: 0, homeRev: 0, ghost: 0, honkT: 0, parkD: 0, out: Infinity, lastStop: -1, smoke: 0, wakeDelay: 0,
   };
 }
 const carLen = t => TRAINS[t.type].len;
@@ -712,7 +716,7 @@ function reverseTrain(t) {
   t.segs = t.segs.slice(0, k + 1).reverse().map(s => ({ r: s.r, c: s.c, a: s.b, b: s.a }));
   t.h = L - pos;
   t.cars.reverse(); t.cars.forEach(c => { c.flip = !c.flip; });
-  t.blocked = 0; t.v = 0;
+  t.blocked = 0; t.v = 0; t.out = Infinity;
 }
 
 function trimTrail(t) {
@@ -732,7 +736,68 @@ function chooseExit(t, r, c, entry, ex) {
   k.sw = (k.sw + 1) % 2; // switches take turns so trains visit everything
   return b;
 }
-function routeExit(r, c, entry, ex) { return null; }
+// ---------- finding the way home ----------
+// breadth-first search over (cell, entry edge) states to the nearest yard
+function yardDist(r, c, entry) {
+  const seen = new Uint8Array(ROWS * COLS * 16);
+  const q = [[r, c, entry, 0]];
+  for (let qi = 0; qi < q.length; qi++) {
+    const [rr, cc, e, d] = q[qi];
+    const key = (rr * COLS + cc) * 16 + e;
+    if (seen[key]) continue;
+    seen[key] = 1;
+    const k = cell(rr, cc);
+    if (!k || k.t === null) continue;
+    if (k.o === 'yard') return d;
+    for (const x of exitsFrom(k.t, e)) if (connected(rr, cc, x)) q.push([rr + DY[x], cc + DX[x], OPP[x], d + 1]);
+  }
+  return Infinity;
+}
+function routeExit(r, c, entry, ex) {
+  let best = null, bd = Infinity;
+  for (const e of ex) {
+    if (!connected(r, c, e)) continue;
+    const d = yardDist(r + DY[e], c + DX[e], OPP[e]);
+    if (d < bd) { bd = d; best = e; }
+  }
+  return best;
+}
+function distAhead(t) {
+  const s0 = t.segs[0];
+  if (cell(s0.r, s0.c).o === 'yard') return 0;
+  if (!connected(s0.r, s0.c, s0.b)) return Infinity;
+  return 1 + yardDist(s0.r + DY[s0.b], s0.c + DX[s0.b], OPP[s0.b]);
+}
+function distBehind(t) {
+  // what the trip home would be if the train turned around
+  const tail = t.segs[t.segs.length - 1];
+  if (cell(tail.r, tail.c).o === 'yard') return t.segs.length;
+  if (!connected(tail.r, tail.c, tail.a)) return Infinity;
+  return t.segs.length + 2 + yardDist(tail.r + DY[tail.a], tail.c + DX[tail.a], OPP[tail.a]);
+}
+function goHome(t) {
+  t.state = 'home'; t.homeRev = 0;
+  const f = distAhead(t), b = distBehind(t);
+  if (f === Infinity && b === Infinity) { t.state = 'sleep'; return; } // no yard to reach: nap right here
+  if (b < f) reverseTrain(t);
+}
+function wakeUp(t) {
+  t.state = 'run'; t.homeRev = 0;
+  const s0 = t.segs[0], k = cell(s0.r, s0.c);
+  if (t.parkD > 0 && k && k.t !== null) {
+    // drive out of the shed through any open door
+    const ends = DIRS.filter(d => (touchedEdges(k) & d) && connected(s0.r, s0.c, d));
+    const b = ends.length ? ends[Math.floor(Math.random() * ends.length)] : s0.b;
+    const a = exitsFrom(k.t, b)[0] || OPP[b];
+    t.segs = [{ r: s0.r, c: s0.c, a, b }];
+    t.h = segLen(t.segs[0]) * 0.5;
+    t.parkD = 0; t.out = 0; t.v = 0; // the wagons appear one by one as they leave the shed
+    buildTrailBack(t);
+  }
+  t.parkD = 0;
+  sfx('honk', t.type);
+  t.honkT = 1.2;
+}
 
 // move the front of the train forward; returns false if it hit a buffer stop
 function advance(t, dist) {
@@ -801,6 +866,13 @@ function updateTrains(dt) {
     if (t.honkT > 0) t.honkT -= dt;
     if (t.ghost > 0) t.ghost -= dt;
     trainBrain(t, dt);
+    const dark = darkness();
+    t.lamp += clamp((t.state === 'sleep' || t.state === 'park' ? 0 : dark) - t.lamp, -dt * 0.7, dt * 0.7);
+    if (t.state === 'park') { // sliding into the shed
+      t.parkD += dt * 1.1;
+      if (t.parkD >= trainLen(t) + 0.1) { t.state = 'sleep'; sfx('chime', [72, 74, 76, 79, 81][t.id % 5]); saveSoon(); }
+      continue;
+    }
     const spec = TRAINS[t.type];
     let target = t.state === 'run' || t.state === 'home' || t.state === 'wake' ? spec.speed : 0;
     if (t.wait > 0) { t.wait -= dt; target = 0; }
@@ -813,6 +885,7 @@ function updateTrains(dt) {
     t.v += clamp(target - t.v, -acc * dt, acc * dt);
     if (t.v > 0.001) {
       if (!advance(t, t.v * dt)) { onBufferStop(t); }
+      if (t.out !== Infinity) { t.out += t.v * dt; if (t.out > trainLen(t) + 0.2) t.out = Infinity; }
       t.stuck = 0;
     } else if (target === 0 && t.blocked > 0) {
       t.stuck += dt;
@@ -826,19 +899,173 @@ function updateTrains(dt) {
   updatePuffs(dt);
 }
 
-function onBufferStop(t) { reverseTrain(t); }
-function onBlocked(t) { reverseTrain(t); }
+function onBufferStop(t) {
+  reverseTrain(t);
+  if (t.state === 'home') { if (++t.homeRev > 3 || distAhead(t) === Infinity) t.state = 'sleep'; }
+}
+function onBlocked(t) {
+  reverseTrain(t);
+  if (t.state === 'home') { if (++t.homeRev > 2 || distAhead(t) === Infinity) t.state = 'sleep'; }
+}
+function nextCellIs(s0, what) {
+  if (!connected(s0.r, s0.c, s0.b)) return false;
+  const n = cell(s0.r + DY[s0.b], s0.c + DX[s0.b]);
+  return n && n.o === what;
+}
 function trainBrain(t, dt) {
   const s0 = t.segs[0], k = cell(s0.r, s0.c), idx = s0.r * COLS + s0.c;
-  if (t.lastStop !== idx) { if (k.o !== 'station') t.lastStop = -1; }
-  // stop at stations in the daytime and let people hop on
-  if (t.state === 'run' && k.o === 'station' && t.lastStop !== idx && t.h >= segLen(s0) * 0.5 && t.poses && t.poses[0]) {
+  const night = isNight();
+  if (night && (t.state === 'run' || t.state === 'wake')) goHome(t);
+  if (!night) {
+    if (t.state === 'home') t.state = 'run';
+    if (t.state === 'sleep' || t.state === 'park') { t.wakeDelay -= dt; if (t.wakeDelay <= 0) wakeUp(t); }
+  }
+  // tucked into a yard: stop in the middle of the deepest shed cell and slide inside
+  if (t.state === 'home' && k.o === 'yard' && t.h >= segLen(s0) * 0.5 && !nextCellIs(s0, 'yard')) {
+    t.h = segLen(s0) * 0.5; t.state = 'park'; t.v = 0; t.wait = 0;
+    return;
+  }
+  if (k.o !== 'station') t.lastStop = -1;
+  // stop at stations in the daytime (at the far end of the platform) and let people hop on
+  if (t.state === 'run' && k.o === 'station' && t.lastStop !== idx && !nextCellIs(s0, 'station') && t.h >= segLen(s0) * 0.5 && t.poses && t.poses[0]) {
     t.lastStop = idx; t.wait = 2.6;
     sfx('chime', 84);
     setTimeout(() => { if (boardTrain(idx, t)) sfx('hop'); }, 600);
   }
 }
-function isNight() { return false; }
+// ---------- day and night ----------
+const CYCLE = 150, DUSK = 95, NIGHT = 105, DAWN = 140;
+function isNight() { return world.time >= DUSK && world.time < DAWN; }
+function darkness() {
+  const t = world.time;
+  if (t < DUSK) return 0;
+  if (t < NIGHT) return (t - DUSK) / (NIGHT - DUSK);
+  if (t < DAWN) return 1;
+  return 1 - (t - DAWN) / (CYCLE - DAWN);
+}
+function setTime(nt) {
+  const was = isNight();
+  world.time = nt;
+  if (!was && isNight()) onDusk();
+  if (was && !isNight()) onDawn();
+}
+function advanceTime(dt) {
+  let nt = world.time + dt;
+  if (nt >= CYCLE) nt -= CYCLE;
+  setTime(nt);
+}
+function onDusk() {
+  sfx('lullaby');
+  refreshSky();
+}
+function onDawn() {
+  sfx('morning');
+  // wake up one after another, with a toot each
+  let i = 0;
+  for (const t of world.trains) if (t.state === 'sleep' || t.state === 'park') t.wakeDelay = 1 + i++ * 1.6 + Math.random() * 0.4;
+  refreshSky();
+}
+function skyTap() {
+  if (isNight()) setTime(DAWN); else setTime(DUSK);
+  saveSoon();
+}
+function refreshSky() { const b = bar.querySelector('[data-name="sky"]'); if (b) paintIcon(b, 'sky'); }
+
+// darkness, glowing windows and train lights
+const fireflies = Array.from({ length: 14 }, () => ({ x: rnd(0, COLS), y: rnd(0, ROWS), p: rnd(0, TAU) }));
+function glow(x, y, r, col, a) {
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, col + a + ')'); g.addColorStop(1, col + '0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+}
+function drawNight() {
+  const d = darkness();
+  // golden-hour tint at dusk and dawn
+  const tint = Math.sin(Math.PI * clamp(d, 0, 1)) * (world.time > DAWN || world.time < NIGHT ? 1 : 0);
+  if (tint > 0.01) { ctx.fillStyle = 'rgba(255,140,60,' + (tint * 0.18) + ')'; ctx.fillRect(0, 0, VW, VH); }
+  if (d > 0.01) { ctx.fillStyle = 'rgba(14,22,70,' + (d * 0.58) + ')'; ctx.fillRect(0, 0, VW, VH); }
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  if (d > 0.01) {
+    world.cells.forEach((k, idx) => {
+      const x = OX + (idx % COLS + 0.5) * CS, y = OY + (Math.floor(idx / COLS) + 0.5) * CS;
+      if (k.o === 'house') glow(x, y, CS * 0.5, 'rgba(255,200,90,', 0.45 * d);
+      if (k.o === 'station') glow(x, y, CS * 0.6, 'rgba(160,210,255,', 0.35 * d);
+      if (k.o === 'yard') glow(x, y, CS * 0.55, 'rgba(255,190,110,', 0.25 * d);
+    });
+    for (const f of fireflies) {
+      f.p += 0.02; f.x += Math.cos(f.p * 0.7) * 0.004; f.y += Math.sin(f.p) * 0.004;
+      const a = d * (0.5 + 0.5 * Math.sin(f.p * 3));
+      glow(OX + f.x * CS, OY + f.y * CS, CS * 0.12, 'rgba(220,255,120,', 0.7 * a);
+    }
+  }
+  for (const t of world.trains) drawTrainLights(t, d);
+  ctx.restore();
+}
+function drawTrainLights(t, d) {
+  if (!t.poses) return;
+  const honk = t.honkT > 0;
+  const lamp = Math.max(t.lamp, honk ? 0.9 : 0);
+  if (lamp < 0.02) return;
+  const L = carLen(t);
+  const first = t.poses[0], last = t.poses[t.poses.length - 1];
+  if (first) {
+    // the end of the front car that faces where we're going
+    const dir = first.ang + (first.car.flip ? Math.PI : 0);
+    const fx = first.x + Math.cos(dir) * L * 0.5, fy = first.y + Math.sin(dir) * L * 0.5;
+    const px = -Math.sin(dir) * 0.14, py = Math.cos(dir) * 0.14;
+    let aL = lamp, aR = lamp;
+    if (honk) { const on = Math.floor(t.honkT * 10) % 2; aL = on ? 1 : 0.15; aR = on ? 0.15 : 1; } // waving lights
+    glow(OX + (fx + Math.cos(dir) * 0.55) * CS, OY + (fy + Math.sin(dir) * 0.55) * CS, CS * 0.75, 'rgba(255,240,170,', 0.35 * lamp * Math.max(d, honk ? 0.4 : 0));
+    glow(OX + (fx + px) * CS, OY + (fy + py) * CS, CS * 0.22, 'rgba(255,245,180,', 0.9 * aL);
+    glow(OX + (fx - px) * CS, OY + (fy - py) * CS, CS * 0.22, 'rgba(255,245,180,', 0.9 * aR);
+  }
+  if (last && d > 0.05) {
+    const dir = last.ang + (last.car.flip ? Math.PI : 0) + Math.PI;
+    const bx = last.x + Math.cos(dir) * L * 0.5, by = last.y + Math.sin(dir) * L * 0.5;
+    glow(OX + bx * CS, OY + by * CS, CS * 0.18, 'rgba(255,60,60,', 0.7 * t.lamp);
+  }
+  // cosy windows
+  if (d > 0.05) for (const p of t.poses) if (p && p.car.kind !== 'loco' && p.car.kind !== 'tender' && t.type !== 'freight') glow(OX + p.x * CS, OY + p.y * CS, CS * 0.35, 'rgba(255,210,120,', 0.22 * t.lamp);
+}
+
+// sleepy Zzz over yards with trains inside, and over trains napping on the track
+function drawZzz() {
+  const sleepers = new Map();
+  for (const t of world.trains) {
+    if (t.state !== 'sleep' && t.state !== 'park') continue;
+    let x, y;
+    if (t.parkD > 0) { x = t.segs[0].c + 0.5; y = t.segs[0].r + 0.5; }
+    else { const p = (t.poses || []).find(Boolean); if (!p) continue; x = p.x; y = p.y; }
+    const key = Math.round(x * 10) + ',' + Math.round(y * 10);
+    sleepers.set(key, { x, y, n: (sleepers.get(key) || { n: 0 }).n + 1 });
+  }
+  ctx.strokeStyle = '#ffffff'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const { x, y, n } of sleepers.values()) {
+    for (let i = 0; i < Math.min(3, n + 1); i++) {
+      const ph = (T * 0.45 + i / 3) % 1, sz = CS * (0.1 + ph * 0.12);
+      const zx = OX + (x + 0.15 + Math.sin(ph * 5 + i) * 0.12) * CS, zy = OY + (y - 0.2 - ph * 0.9) * CS;
+      ctx.globalAlpha = Math.sin(ph * Math.PI);
+      ctx.lineWidth = Math.max(2, CS * 0.04);
+      ctx.beginPath(); ctx.moveTo(zx - sz / 2, zy - sz / 2); ctx.lineTo(zx + sz / 2, zy - sz / 2); ctx.lineTo(zx - sz / 2, zy + sz / 2); ctx.lineTo(zx + sz / 2, zy + sz / 2); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
+ICONS.sky = (g, w, h) => {
+  const s = Math.min(w, h), cx = w / 2, cy = h / 2;
+  if (world && isNight()) {
+    g.fillStyle = '#1b2a5a'; rrect(g, 6, 6, w - 12, h - 12, 16); g.fill();
+    circle(g, cx, cy, s * 0.26, '#ffe066'); circle(g, cx + s * 0.12, cy - s * 0.08, s * 0.22, '#1b2a5a');
+    [[0.25, 0.25], [0.75, 0.3], [0.7, 0.75]].forEach(([fx, fy]) => circle(g, w * fx, h * fy, 2.5, '#fff'));
+  } else {
+    g.fillStyle = '#a5d8ff'; rrect(g, 6, 6, w - 12, h - 12, 16); g.fill();
+    g.strokeStyle = '#fab005'; g.lineWidth = s * 0.05; g.lineCap = 'round';
+    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; g.beginPath(); g.moveTo(cx + Math.cos(a) * s * 0.26, cy + Math.sin(a) * s * 0.26); g.lineTo(cx + Math.cos(a) * s * 0.36, cy + Math.sin(a) * s * 0.36); g.stroke(); }
+    circle(g, cx, cy, s * 0.2, '#ffd43b');
+  }
+};
 
 function headInfo(t) {
   const s = t.segs[0], L = segLen(s), f = clamp(t.h / L, 0, 1);
@@ -847,10 +1074,12 @@ function headInfo(t) {
 }
 
 function pathBlocked(t) {
+  const s0 = t.segs[0];
+  if (t.state === 'home' && cell(s0.r, s0.c).o === 'yard') return false; // the shed always has room
   const h = headInfo(t);
   const lx = h.x + h.dx * 0.42, ly = h.y + h.dy * 0.42;
   for (const o of world.trains) {
-    if (o === t || o.ghost > 0) continue;
+    if (o === t || o.ghost > 0 || o.state === 'park') continue;
     for (const p of o.poses) {
       if (!p) continue;
       const dx = p.x - lx, dy = p.y - ly;
@@ -1183,7 +1412,14 @@ function tapThingAt(r, c) {
   if (k.o === 'yard') { yardTap(idx); return true; }
   return false;
 }
-function yardTap(idx) { sfx('snore'); }
+function yardTap(idx) {
+  const r = Math.floor(idx / COLS), c = idx % COLS;
+  const inside = world.trains.filter(t => (t.state === 'sleep' || t.state === 'park') && t.parkD > 0 && Math.abs(t.segs[0].r - r) + Math.abs(t.segs[0].c - c) <= 1);
+  if (inside.length && isNight()) sfx('snore');
+  else if (inside.length) { const t = inside[0]; t.wakeDelay = 0; }
+  else sfx('snore');
+  puff(r, c);
+}
 
 function trainAt(px, py) {
   const x = (px - OX) / CS, y = (py - OY) / CS;
@@ -1267,7 +1503,7 @@ function paintIcon(b, name) {
   ICONS[name] && ICONS[name](g, w, h);
 }
 
-const ICONS = {
+Object.assign(ICONS, {
   track(g, w, h) {
     const s = Math.min(w, h);
     g.save(); g.translate(w / 2, h / 2);
@@ -1282,7 +1518,7 @@ const ICONS = {
     rrect(g, s * 0.12, s * 0.02, s * 0.14, s * 0.3, s * 0.07); g.fill(); g.stroke();
     g.restore();
   },
-};
+});
 
 ICONS.station = (g, w, h) => {
   const s = Math.min(w, h); g.save(); g.translate(w / 2 - s / 2, h / 2 - s / 2);
@@ -1444,6 +1680,7 @@ function buildToolbar() {
   makeIconButton(bar, 'train', '', () => { if (picker.classList.contains('show')) hidePicker(); else { tool = 'train'; refreshToolbar(); showPicker(); } });
   ['station', 'yard', 'bridge', 'tunnel', 'tree', 'house', 'eraser'].forEach(n => makeIconButton(bar, n, '', b => selectTool(n)));
   const gap = document.createElement('div'); gap.className = 'gap'; bar.appendChild(gap);
+  makeIconButton(bar, 'sky', 'sky', () => skyTap());
   makeIconButton(bar, 'undo', 'undo', () => undo());
   refreshToolbar();
 }
