@@ -6,7 +6,7 @@ Goal: `train-world/index.html` — one self-contained file (HTML/CSS/JS, no libr
 iPad touch friendly, no text, no money/score/timers, autosave in localStorage.
 
 ### Plan (this run)
-1. [ ] Scaffold + world (~25 min): page layout, responsive canvas, grid with grass/river/roads,
+1. [x] Scaffold + world (~25 min): page layout, responsive canvas, grid with grass/river/roads,
    icon toolbar (80px+ buttons), render loop, localStorage save/load.
 2. [ ] Tracks (~30 min): tap/drag to lay track, auto-snapping straights, curves, switches,
    crossings, auto-bridge over water, eraser.
@@ -19,10 +19,10 @@ iPad touch friendly, no text, no money/score/timers, autosave in localStorage.
    undo, clear with confirm, Web Audio sounds, iPad touch tuning, Playwright smoke test.
 
 ### Done
-- (nothing yet)
+- Step 1: page layout, grid world (grass, river, roads, road bridge), icon toolbar, save/load (train-world/index.html)
 
 ### Next
-- Step 1
+- Step 2: tracks
 
 ### Blocked
 - Nothing
