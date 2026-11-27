@@ -19,12 +19,12 @@
   #stage { flex: 1; position: relative; min-height: 0; background: #5aa84f; }
   #world { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
   #bar {
-    display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px;
+    display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px;
     padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); background: #2d4a6b;
   }
-  .gap { width: 14px; }
+  .gap { width: 10px; }
   .btn {
-    width: 88px; height: 88px; border-radius: 22px; border: 0; padding: 0; margin: 0;
+    width: clamp(80px, calc((100vw - 150px) / 13), 92px); height: clamp(80px, calc((100vw - 150px) / 13), 92px); border-radius: 22px; border: 0; padding: 0; margin: 0;
     background: #fff; box-shadow: 0 6px 0 rgba(0,0,0,.28); cursor: pointer;
     transition: transform .08s, box-shadow .08s, background .15s; touch-action: manipulation;
     flex: 0 0 auto;
@@ -73,7 +73,7 @@
    ===================================================================== */
 
 // ---------- constants ----------
-const COLS = 20, ROWS = 14;
+const COLS = 16, ROWS = 11;
 const N = 1, E = 2, S = 4, W = 8;
 const DIRS = [N, E, S, W];
 const DX = { 1: 0, 2: 1, 4: 0, 8: -1 };
@@ -100,13 +100,13 @@ function makeTerrain() {
   const at = (r, c) => cells[r * COLS + c];
   // a wiggly river running top to bottom
   for (let r = 0; r < ROWS; r++) {
-    const x = 12 + Math.round(Math.sin(r * 0.55) * 1.4);
+    const x = 10 + Math.round(Math.sin(r * 0.6) * 1.2);
     at(r, x).g = 'water'; at(r, x + 1).g = 'water';
   }
   // a long road across, with its own road bridge, and a road going up
-  for (let c = 0; c < COLS; c++) { const k = at(10, c); k.g = k.g === 'water' ? 'rbridge' : 'road'; }
-  for (let r = 0; r < 10; r++) at(r, 3).g = 'road';
-  for (let r = 11; r < ROWS; r++) at(r, 17).g = 'road';
+  for (let c = 0; c < COLS; c++) { const k = at(8, c); k.g = k.g === 'water' ? 'rbridge' : 'road'; }
+  for (let r = 0; r < 8; r++) at(r, 2).g = 'road';
+  for (let r = 9; r < ROWS; r++) at(r, 14).g = 'road';
   return cells;
 }
 
@@ -119,23 +119,26 @@ function buildStarter() {
   buildDecor();
   // a little loop with (later) a yard, a station and a steam engine so something moves straight away
   const loop = [];
-  for (let c = 5; c <= 9; c++) loop.push([2, c]);
-  for (let r = 3; r <= 7; r++) loop.push([r, 9]);
-  for (let c = 8; c >= 5; c--) loop.push([7, c]);
-  for (let r = 6; r >= 2; r--) loop.push([r, 5]);
+  for (let c = 4; c <= 7; c++) loop.push([1, c]);
+  for (let r = 2; r <= 5; r++) loop.push([r, 7]);
+  for (let c = 6; c >= 4; c--) loop.push([5, c]);
+  for (let r = 4; r >= 1; r--) loop.push([r, 4]);
   for (let i = 0; i < loop.length - 1; i++) link(loop[i][0], loop[i][1], loop[i + 1][0], loop[i + 1][1]);
   starterExtras();
 }
 
 function starterExtras() {
-  const t = placeTrain('steam', 5, 5);
-  if (t) { t.segs = [{ r: 5, c: 5, a: S, b: N }]; t.h = 0.5; buildTrailBack(t); }
+  cell(1, 5).o = 'yard'; cell(1, 6).o = 'yard';
+  cell(5, 5).o = 'station'; cell(5, 6).o = 'station';
+  cell(3, 5).o = 'tree'; cell(2, 6).o = 'tree';
+  const t = placeTrain('steam', 3, 4);
+  if (t) { t.segs = [{ r: 3, c: 4, a: S, b: N }]; t.h = 0.5; buildTrailBack(t); }
 }
 
 function buildDecor() {
   // a few houses and trees for decoration
-  [[11, 1], [12, 5], [8, 1], [12, 9], [2, 17], [5, 18]].forEach(([r, c], i) => { const k = cell(r, c); if (k.g === 'grass') { k.o = 'house'; k.v = i % 4; } });
-  [[0, 0], [1, 1], [13, 0], [11, 7], [0, 9], [13, 13], [7, 19], [12, 19], [1, 15], [6, 15]].forEach(([r, c]) => { const k = cell(r, c); if (k.g === 'grass' && !k.o) k.o = 'tree'; });
+  [[9, 0], [10, 4], [6, 0], [10, 7], [1, 14], [4, 15]].forEach(([r, c], i) => { const k = cell(r, c); if (k.g === 'grass') { k.o = 'house'; k.v = i % 4; } });
+  [[0, 0], [1, 1], [10, 0], [9, 6], [0, 8], [10, 13], [6, 15], [9, 15], [0, 13], [5, 13]].forEach(([r, c]) => { const k = cell(r, c); if (k.g === 'grass' && !k.o) k.o = 'tree'; });
 }
 
 // ---------- track topology ----------
@@ -319,7 +322,158 @@ function renderBase() {
   g.fillStyle = '#5aa84f'; g.fillRect(0, 0, VW, VH);
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) drawTerrainCell(g, r, c, OX + c * CS, OY + r * CS, CS);
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) drawCellContents(g, r, c, OX + c * CS, OY + r * CS, CS);
+  // things that sit on top of trains: tunnel hills and train-yard sheds
+  topCanvas.width = cv.width; topCanvas.height = cv.height;
+  const tg = topCanvas.getContext('2d');
+  tg.setTransform(DPR, 0, 0, DPR, 0, 0);
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (cell(r, c).o === 'tunnel') drawTunnel(tg, r, c, OX + c * CS, OY + r * CS, CS);
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (cell(r, c).o === 'yard') drawShed(tg, r, c, OX + c * CS, OY + r * CS, CS);
   baseDirty = false;
+}
+const topCanvas = document.createElement('canvas');
+
+// ---------- stations ----------
+function touchedEdges(k) { return pieces(k.t === null ? 0 : k.t).reduce((m, [a, b]) => m | a | b, 0); }
+function stationSide(k) { const t = touchedEdges(k); return [N, S, W, E].find(d => !(t & d)) || 0; }
+function sideRect(d) {
+  return d === N ? [0, 0, 1, 0.25] : d === S ? [0, 0.75, 1, 0.25] : d === W ? [0, 0, 0.25, 1] : [0.75, 0, 0.25, 1];
+}
+function drawStation(g, k, x, y, s) {
+  const d = stationSide(k);
+  if (!d) { circle(g, x + s * 0.12, y + s * 0.12, s * 0.1, '#1c7ed6'); return; }
+  const [rx, ry, rw, rh] = sideRect(d);
+  g.fillStyle = 'rgba(0,0,0,.15)'; g.fillRect(x + rx * s + 2, y + ry * s + 3, rw * s, rh * s);
+  g.fillStyle = '#e9ecef'; g.fillRect(x + rx * s, y + ry * s, rw * s, rh * s);
+  // yellow safety line on the track side
+  g.fillStyle = '#fcc419';
+  const lw = s * 0.035;
+  if (d === N) g.fillRect(x + rx * s, y + (ry + rh) * s - lw, rw * s, lw);
+  if (d === S) g.fillRect(x + rx * s, y + ry * s, rw * s, lw);
+  if (d === W) g.fillRect(x + (rx + rw) * s - lw, y + ry * s, lw, rh * s);
+  if (d === E) g.fillRect(x + rx * s, y + ry * s, lw, rh * s);
+  // a lamp post and a bench
+  circle(g, x + (rx + rw * (d === N || d === S ? 0.05 : 0.5)) * s, y + (ry + rh * (d === N || d === S ? 0.5 : 0.05)) * s, s * 0.05, '#1c7ed6');
+}
+
+const stationState = new Map();
+function stState(idx) {
+  let st = stationState.get(idx);
+  if (!st) { st = { n: 3, hop: 0, refill: 0, boarding: [] }; stationState.set(idx, st); }
+  return st;
+}
+function personSpot(idx, i) {
+  const r = Math.floor(idx / COLS), c = idx % COLS, k = world.cells[idx], d = stationSide(k);
+  if (!d) return [c + 0.12, r + 0.12];
+  const [rx, ry, rw, rh] = sideRect(d), f = 0.2 + (i % 3) * 0.3 + (i >= 3 ? 0.15 : 0);
+  return d === N || d === S ? [c + rx + rw * f, r + ry + rh / 2] : [c + rx + rw / 2, r + ry + rh * f];
+}
+const PEOPLE_COLS = ['#f03e3e', '#7048e8', '#f59f00', '#12b886', '#e64980', '#1c7ed6'];
+const SKIN = ['#f1c27d', '#c68642', '#8d5524', '#ffdbac'];
+function drawPerson(x, y, i, lift) {
+  const r = CS * 0.08;
+  ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.arc(x + 1, y + 2, r * 1.3, 0, TAU); ctx.fill();
+  const yy = y - lift * CS * 0.25, sc = 1 + lift * 0.4;
+  circle(ctx, x, yy, r * 1.3 * sc, PEOPLE_COLS[i % PEOPLE_COLS.length]);
+  circle(ctx, x, yy, r * 0.8 * sc, SKIN[i % SKIN.length]);
+}
+function updateStations(dt) {
+  for (const [idx, st] of stationState) {
+    if (world.cells[idx].o !== 'station') { stationState.delete(idx); continue; }
+    if (st.hop > 0) st.hop -= dt;
+    if (st.n < 4) { st.refill += dt; if (st.refill > 3.5) { st.refill = 0; st.n++; } }
+    for (const b of st.boarding) b.t += dt * 2.2;
+    st.boarding = st.boarding.filter(b => b.t < 1);
+  }
+}
+function drawStationPeople() {
+  world.cells.forEach((k, idx) => {
+    if (k.o !== 'station') return;
+    const st = stState(idx);
+    for (let i = 0; i < st.n; i++) {
+      const [px, py] = personSpot(idx, i);
+      const lift = st.hop > 0 ? Math.abs(Math.sin((st.hop + i * 0.12) * 9)) : 0;
+      drawPerson(OX + px * CS, OY + py * CS, i + idx, lift);
+    }
+    for (const b of st.boarding) {
+      const x = b.x0 + (b.x1 - b.x0) * b.t, y = b.y0 + (b.y1 - b.y0) * b.t;
+      ctx.globalAlpha = 1 - b.t * b.t;
+      drawPerson(OX + x * CS, OY + y * CS, b.i, Math.sin(b.t * Math.PI));
+      ctx.globalAlpha = 1;
+    }
+  });
+}
+// everyone on the platform hops onto the train standing at the station
+function boardTrain(idx, t) {
+  const st = stState(idx), r = Math.floor(idx / COLS), c = idx % COLS;
+  if (!st.n) return false;
+  const tx = c + 0.5, ty = r + 0.5;
+  for (let i = 0; i < st.n; i++) { const [px, py] = personSpot(idx, i); st.boarding.push({ x0: px, y0: py, x1: tx, y1: ty, t: -i * 0.25, i: i + idx }); }
+  st.n = 0; st.refill = -2;
+  if (t) t.riders = Math.min(9, (t.riders || 0) + 1);
+  return true;
+}
+function trainAtStation(idx) {
+  const r = Math.floor(idx / COLS), c = idx % COLS;
+  return world.trains.find(t => t.wait > 0 && t.segs[0].r === r && t.segs[0].c === c) ||
+    world.trains.find(t => (t.poses || []).some(p => p && Math.floor(p.x) === c && Math.floor(p.y) === r));
+}
+
+// ---------- sheds (train yards) and tunnel hills ----------
+function shedVertical(k) { return k.t !== null && (k.t & (N | S)) && !(k.t & (E | W)); }
+function drawShed(g, r, c, x, y, s) {
+  const k = cell(r, c), vert = shedVertical(k), o = s * 0.08;
+  const isYard = (rr, cc) => { const n = cell(rr, cc); return n && n.o === 'yard' && shedVertical(n) === vert; };
+  // extend into neighbouring shed cells along the ridge so long sheds look like one building
+  const ext = vert ? [isYard(r - 1, c), isYard(r + 1, c)] : [isYard(r, c - 1), isYard(r, c + 1)];
+  let x0 = x - o, y0 = y - o, x1 = x + s + o, y1 = y + s + o;
+  if (vert) { if (ext[0]) y0 = y; if (ext[1]) y1 = y + s; } else { if (ext[0]) x0 = x; if (ext[1]) x1 = x + s; }
+  g.fillStyle = 'rgba(0,0,0,.22)'; g.fillRect(x0 + s * 0.07, y0 + s * 0.09, x1 - x0, y1 - y0);
+  // two roof halves with a ridge
+  if (vert) {
+    g.fillStyle = '#c92a2a'; g.fillRect(x0, y0, (x1 - x0) / 2, y1 - y0);
+    g.fillStyle = '#e03131'; g.fillRect((x0 + x1) / 2, y0, (x1 - x0) / 2, y1 - y0);
+  } else {
+    g.fillStyle = '#c92a2a'; g.fillRect(x0, y0, x1 - x0, (y1 - y0) / 2);
+    g.fillStyle = '#e03131'; g.fillRect(x0, (y0 + y1) / 2, x1 - x0, (y1 - y0) / 2);
+  }
+  g.strokeStyle = '#ffc9c9'; g.lineWidth = Math.max(2, s * 0.04);
+  g.beginPath();
+  if (vert) { g.moveTo((x0 + x1) / 2, y0); g.lineTo((x0 + x1) / 2, y1); } else { g.moveTo(x0, (y0 + y1) / 2); g.lineTo(x1, (y0 + y1) / 2); }
+  g.stroke();
+  // roof edges
+  g.strokeStyle = '#a61e1e'; g.lineWidth = Math.max(2, s * 0.05);
+  g.strokeRect(x0, y0, x1 - x0, y1 - y0);
+  // big door openings where tracks go in
+  const m = k.t === null ? 0 : touchedEdges(k);
+  g.fillStyle = '#2b2f36';
+  const dw = s * 0.62, dd = s * 0.14;
+  if (m & N && !(vert && ext[0])) rrect(g, x + (s - dw) / 2, y0 - 1, dw, dd, 3), g.fill();
+  if (m & S && !(vert && ext[1])) rrect(g, x + (s - dw) / 2, y1 - dd + 1, dw, dd, 3), g.fill();
+  if (m & W && !(!vert && ext[0])) rrect(g, x0 - 1, y + (s - dw) / 2, dd, dw, 3), g.fill();
+  if (m & E && !(!vert && ext[1])) rrect(g, x1 - dd + 1, y + (s - dw) / 2, dd, dw, 3), g.fill();
+  // a sleepy moon on the roof
+  const cx = x + s / 2 + (vert ? s * 0.22 : 0), cy = y + s / 2 + (vert ? 0 : s * 0.22);
+  circle(g, cx, cy, s * 0.13, '#ffe066');
+  circle(g, cx + s * 0.06, cy - s * 0.04, s * 0.11, vert ? '#e03131' : '#e03131');
+}
+
+function drawTunnel(g, r, c, x, y, s) {
+  const k = cell(r, c), cx = x + s / 2, cy = y + s / 2;
+  circle(g, cx + s * 0.07, cy + s * 0.1, s * 0.64, 'rgba(0,0,0,.2)');
+  circle(g, cx, cy, s * 0.64, '#5c940d');
+  circle(g, cx - s * 0.08, cy - s * 0.08, s * 0.45, '#74b816');
+  circle(g, cx - s * 0.16, cy - s * 0.16, s * 0.2, '#94d82d');
+  circle(g, cx + s * 0.2, cy + s * 0.15, s * 0.07, '#adb5bd');
+  circle(g, cx - s * 0.22, cy + s * 0.2, s * 0.05, '#adb5bd');
+  // portals where the rails go in
+  const m = k.t === null ? 0 : touchedEdges(k);
+  for (const d of DIRS) {
+    if (!(m & d)) continue;
+    g.save(); g.translate(cx + DX[d] * s * 0.5, cy + DY[d] * s * 0.5); g.rotate(Math.atan2(DY[d], DX[d]));
+    g.fillStyle = '#868e96'; rrect(g, -s * 0.2, -s * 0.38, s * 0.26, s * 0.76, s * 0.1); g.fill();
+    g.fillStyle = '#212529'; rrect(g, -s * 0.12, -s * 0.28, s * 0.2, s * 0.56, s * 0.08); g.fill();
+    g.restore();
+  }
 }
 
 function drawCellContents(g, r, c, x, y, s) {
@@ -328,6 +482,7 @@ function drawCellContents(g, r, c, x, y, s) {
   if (k.t !== null) drawTrack(g, k, x, y, s);
   if (k.o === 'tree') drawTree(g, x, y, s, k.v);
   if (k.o === 'house') drawHouse(g, x, y, s, k.v, 0);
+  if (k.o === 'station') drawStation(g, k, x, y, s);
 }
 
 function tracePiece(g, a, b, x, y, s, off) {
@@ -440,6 +595,7 @@ function frame(now) {
 
 function update(dt) {
   updateTrains(dt);
+  updateStations(dt);
   saveTimer += dt;
   if (saveTimer > 4) { saveTimer = 0; save(); }
 }
@@ -451,6 +607,10 @@ function draw() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   drawWaterSparkles();
   for (const t of world.trains) if (t.poses) drawTrain(t);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(topCanvas, 0, 0);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  drawStationPeople();
   drawPuffs();
   drawSparkles();
 }
@@ -668,7 +828,16 @@ function updateTrains(dt) {
 
 function onBufferStop(t) { reverseTrain(t); }
 function onBlocked(t) { reverseTrain(t); }
-function trainBrain(t, dt) { }
+function trainBrain(t, dt) {
+  const s0 = t.segs[0], k = cell(s0.r, s0.c), idx = s0.r * COLS + s0.c;
+  if (t.lastStop !== idx) { if (k.o !== 'station') t.lastStop = -1; }
+  // stop at stations in the daytime and let people hop on
+  if (t.state === 'run' && k.o === 'station' && t.lastStop !== idx && t.h >= segLen(s0) * 0.5 && t.poses && t.poses[0]) {
+    t.lastStop = idx; t.wait = 2.6;
+    sfx('chime', 84);
+    setTimeout(() => { if (boardTrain(idx, t)) sfx('hop'); }, 600);
+  }
+}
 function isNight() { return false; }
 
 function headInfo(t) {
@@ -940,9 +1109,9 @@ function tapAt(r, c) {
 }
 
 // tools that act on every cell a finger passes over
-const PAINT_TOOLS = new Set(['eraser', 'tree', 'house', 'bridge']);
+const PAINT_TOOLS = new Set(['eraser', 'tree', 'house', 'bridge', 'tunnel']);
 // tools that act on a single tap
-const PLACE_TOOLS = new Set(['station', 'yard', 'tunnel', 'train']);
+const PLACE_TOOLS = new Set(['station', 'yard', 'train']);
 
 function paintAt(r, c) {
   const key = r * COLS + c;
@@ -974,8 +1143,47 @@ function placeAt(r, c) {
   }
   placeThing(r, c);
 }
-function placeThing(r, c) { }
-function tapThingAt(r, c) { return false; }
+function placeThing(r, c) {
+  const k = cell(r, c);
+  const ok = () => { if (!stroke.snap) { stroke.snap = true; pushUndo(); } };
+  const land = k.g === 'grass' || k.g === 'road';
+  if (tool === 'tree' || tool === 'house') {
+    if (k.g !== 'grass' || k.t !== null || k.o || k.b) { if (!k.o) sfx('boop'); return; }
+    ok(); k.o = tool; k.v = Math.floor(Math.random() * 4);
+    changed(); sfx(tool === 'tree' ? 'plant' : 'knock'); puff(r, c);
+  } else if (tool === 'bridge') {
+    if (k.g !== 'water' || k.b) { if (!k.b) sfx('boop'); return; }
+    ok(); k.b = 1; changed(); sfx('clack'); puff(r, c);
+  } else if (tool === 'station' || tool === 'yard' || tool === 'tunnel') {
+    if (!land || (k.o && k.o !== tool)) { sfx('boop'); return; }
+    if (k.o === tool) return;
+    ok();
+    if (tool !== 'tunnel' && k.t === null) tapTrack(r, c);
+    k.o = tool;
+    // yards and stations on a straight track grow to two cells: a long shed / a long platform
+    if (tool !== 'tunnel' && k.t !== null && bits(k.t) === 2 && pieces(k.t)[0][0] === OPP[pieces(k.t)[0][1]]) {
+      for (const d of DIRS) {
+        if (!(k.t & d)) continue;
+        const n = cell(r + DY[d], c + DX[d]);
+        if (n && n.o === null && n.t === (DY[d] ? N | S : E | W) && (n.g === 'grass' || n.g === 'road')) { n.o = tool; break; }
+      }
+    }
+    changed(); sfx(tool === 'yard' ? 'snore' : 'pop'); puff(r, c);
+  }
+}
+function tapThingAt(r, c) {
+  const k = cell(r, c), idx = r * COLS + c;
+  if (k.o === 'station' && tool !== 'station' || (k.o === 'station' && tool === 'station')) {
+    const st = stState(idx);
+    st.hop = 0.9; sfx('hop');
+    const t = trainAtStation(idx);
+    if (t && boardTrain(idx, t)) { setTimeout(() => sfx('honk', t.type), 500); }
+    return true;
+  }
+  if (k.o === 'yard') { yardTap(idx); return true; }
+  return false;
+}
+function yardTap(idx) { sfx('snore'); }
 
 function trainAt(px, py) {
   const x = (px - OX) / CS, y = (py - OY) / CS;
@@ -1076,6 +1284,68 @@ const ICONS = {
   },
 };
 
+ICONS.station = (g, w, h) => {
+  const s = Math.min(w, h); g.save(); g.translate(w / 2 - s / 2, h / 2 - s / 2);
+  g.fillStyle = '#adb5bd'; g.fillRect(s * 0.1, s * 0.66, s * 0.8, s * 0.12);
+  g.fillStyle = '#fcc419'; g.fillRect(s * 0.1, s * 0.66, s * 0.8, s * 0.03);
+  g.fillStyle = '#495057'; g.fillRect(s * 0.18, s * 0.34, s * 0.05, s * 0.32); g.fillRect(s * 0.77, s * 0.34, s * 0.05, s * 0.32);
+  g.fillStyle = '#1c7ed6'; g.beginPath(); g.moveTo(s * 0.08, s * 0.36); g.lineTo(s * 0.5, s * 0.16); g.lineTo(s * 0.92, s * 0.36); g.closePath(); g.fill();
+  // two people
+  circle(g, s * 0.42, s * 0.44, s * 0.06, '#f1c27d'); g.fillStyle = '#f03e3e'; rrect(g, s * 0.36, s * 0.5, s * 0.12, s * 0.16, 4); g.fill();
+  circle(g, s * 0.6, s * 0.47, s * 0.05, '#c68642'); g.fillStyle = '#7048e8'; rrect(g, s * 0.55, s * 0.52, s * 0.1, s * 0.14, 4); g.fill();
+  g.restore();
+};
+ICONS.yard = (g, w, h) => {
+  const s = Math.min(w, h); g.save(); g.translate(w / 2 - s / 2, h / 2 - s / 2);
+  g.fillStyle = '#e03131'; g.fillRect(s * 0.12, s * 0.4, s * 0.76, s * 0.42);
+  g.fillStyle = '#a61e1e'; g.beginPath(); g.moveTo(s * 0.06, s * 0.42); g.lineTo(s * 0.5, s * 0.14); g.lineTo(s * 0.94, s * 0.42); g.closePath(); g.fill();
+  g.fillStyle = '#2b2f36'; rrect(g, s * 0.3, s * 0.5, s * 0.4, s * 0.32, s * 0.14); g.fill();
+  // sleepy train face peeking out
+  g.fillStyle = '#2f9e44'; rrect(g, s * 0.35, s * 0.6, s * 0.3, s * 0.22, 5); g.fill();
+  g.strokeStyle = '#fff'; g.lineWidth = 2; g.lineCap = 'round';
+  g.beginPath(); g.arc(s * 0.44, s * 0.68, s * 0.03, 0, Math.PI); g.stroke();
+  g.beginPath(); g.arc(s * 0.56, s * 0.68, s * 0.03, 0, Math.PI); g.stroke();
+  // moon
+  circle(g, s * 0.78, s * 0.2, s * 0.1, '#fab005'); circle(g, s * 0.83, s * 0.17, s * 0.09, '#fff');
+  g.restore();
+};
+ICONS.bridge = (g, w, h) => {
+  const s = Math.min(w, h); g.save(); g.translate(w / 2 - s / 2, h / 2 - s / 2);
+  g.fillStyle = '#4dabf7'; rrect(g, s * 0.08, s * 0.56, s * 0.84, s * 0.28, 8); g.fill();
+  g.strokeStyle = '#fff'; g.lineWidth = 2; g.beginPath(); g.arc(s * 0.3, s * 0.76, s * 0.05, Math.PI, TAU); g.arc(s * 0.62, s * 0.72, s * 0.05, Math.PI, TAU); g.stroke();
+  g.fillStyle = '#a0522d'; g.fillRect(s * 0.06, s * 0.38, s * 0.88, s * 0.1);
+  g.strokeStyle = '#a0522d'; g.lineWidth = s * 0.07;
+  g.beginPath(); g.arc(s * 0.5, s * 0.9, s * 0.38, Math.PI * 1.15, Math.PI * 1.85); g.stroke();
+  g.lineWidth = s * 0.05; for (const x of [0.22, 0.5, 0.78]) { g.beginPath(); g.moveTo(s * x, s * 0.4); g.lineTo(s * x, s * 0.56); g.stroke(); }
+  g.fillStyle = '#495057'; g.fillRect(s * 0.06, s * 0.34, s * 0.88, s * 0.04);
+  g.restore();
+};
+ICONS.tunnel = (g, w, h) => {
+  const s = Math.min(w, h); g.save(); g.translate(w / 2 - s / 2, h / 2 - s / 2);
+  g.fillStyle = '#5c940d'; g.beginPath(); g.moveTo(s * 0.04, s * 0.82); g.quadraticCurveTo(s * 0.5, -s * 0.12, s * 0.96, s * 0.82); g.closePath(); g.fill();
+  g.fillStyle = '#94d82d'; g.beginPath(); g.ellipse(s * 0.4, s * 0.38, s * 0.12, s * 0.06, -0.5, 0, TAU); g.fill();
+  g.fillStyle = '#868e96'; g.beginPath(); g.moveTo(s * 0.3, s * 0.82); g.lineTo(s * 0.3, s * 0.6); g.arc(s * 0.5, s * 0.6, s * 0.2, Math.PI, TAU); g.lineTo(s * 0.7, s * 0.82); g.closePath(); g.fill();
+  g.fillStyle = '#212529'; g.beginPath(); g.moveTo(s * 0.37, s * 0.82); g.lineTo(s * 0.37, s * 0.62); g.arc(s * 0.5, s * 0.62, s * 0.13, Math.PI, TAU); g.lineTo(s * 0.63, s * 0.82); g.closePath(); g.fill();
+  g.fillStyle = '#868e96'; g.fillRect(s * 0.02, s * 0.82, s * 0.96, s * 0.04);
+  g.restore();
+};
+ICONS.tree = (g, w, h) => {
+  const s = Math.min(w, h); g.save(); g.translate(w / 2 - s / 2, h / 2 - s / 2);
+  g.fillStyle = '#8b5a2b'; g.fillRect(s * 0.44, s * 0.55, s * 0.12, s * 0.3);
+  circle(g, s * 0.5, s * 0.42, s * 0.28, '#2f9e44'); circle(g, s * 0.36, s * 0.5, s * 0.17, '#37b24d'); circle(g, s * 0.64, s * 0.5, s * 0.17, '#37b24d');
+  circle(g, s * 0.42, s * 0.32, s * 0.1, '#69db7c');
+  circle(g, s * 0.6, s * 0.4, s * 0.04, '#ff6b6b'); circle(g, s * 0.4, s * 0.52, s * 0.04, '#ff6b6b');
+  g.restore();
+};
+ICONS.house = (g, w, h) => {
+  const s = Math.min(w, h); g.save(); g.translate(w / 2 - s / 2, h / 2 - s / 2);
+  g.fillStyle = '#fff3bf'; g.fillRect(s * 0.2, s * 0.44, s * 0.6, s * 0.4);
+  g.fillStyle = '#e8590c'; g.beginPath(); g.moveTo(s * 0.12, s * 0.46); g.lineTo(s * 0.5, s * 0.14); g.lineTo(s * 0.88, s * 0.46); g.closePath(); g.fill();
+  g.fillStyle = '#1c7ed6'; rrect(g, s * 0.44, s * 0.6, s * 0.14, s * 0.24, 3); g.fill();
+  g.fillStyle = '#74c0fc'; g.fillRect(s * 0.26, s * 0.54, s * 0.12, s * 0.1); g.fillRect(s * 0.64, s * 0.54, s * 0.1, s * 0.1);
+  g.fillStyle = '#868e96'; g.fillRect(s * 0.64, s * 0.2, s * 0.08, s * 0.14);
+  g.restore();
+};
 ICONS.eraser = (g, w, h) => {
   const s = Math.min(w, h);
   g.save(); g.translate(w / 2, h / 2); g.rotate(-0.5);
@@ -1172,7 +1442,7 @@ ICONS.train = (g, w, h) => drawSideTrain(g, w, h, trainType);
 function buildToolbar() {
   makeIconButton(bar, 'track', '', () => selectTool('track'));
   makeIconButton(bar, 'train', '', () => { if (picker.classList.contains('show')) hidePicker(); else { tool = 'train'; refreshToolbar(); showPicker(); } });
-  ['eraser'].forEach(n => makeIconButton(bar, n, '', b => selectTool(n)));
+  ['station', 'yard', 'bridge', 'tunnel', 'tree', 'house', 'eraser'].forEach(n => makeIconButton(bar, n, '', b => selectTool(n)));
   const gap = document.createElement('div'); gap.className = 'gap'; bar.appendChild(gap);
   makeIconButton(bar, 'undo', 'undo', () => undo());
   refreshToolbar();
