@@ -10,7 +10,7 @@ iPad touch friendly, no text, no money/score/timers, autosave in localStorage.
    icon toolbar (80px+ buttons), render loop, localStorage save/load.
 2. [x] Tracks (~30 min): tap/drag to lay track, auto-snapping straights, curves, switches,
    crossings, auto-bridge over water, eraser.
-3. [ ] Trains (~30 min): picture menu with 5 trains (commuter, subway, streetcar, freight, steam),
+3. [x] Trains (~30 min): picture menu with 5 trains (commuter, subway, streetcar, freight, steam),
    placing, driving along tracks, switches, dead-end reversing, gentle collision waiting.
 4. [ ] Buildings (~25 min): yards (sheds), stations (people), bridges, tunnels, trees, houses.
 5. [ ] Day/night (~30 min): cycle, trains route to nearest yard and park, lights dim,
@@ -23,8 +23,10 @@ iPad touch friendly, no text, no money/score/timers, autosave in localStorage.
 
 - Step 2: drag/tap track laying with auto-snapping curves, switches, crossings, buffer stops, auto-bridges over water, eraser, undo stack, Web Audio sound engine
 
+- Step 3: five train types (top-down art + side-view picture menu), placing, driving, switches alternate, reversing at buffer stops, waiting behind other trains (with unstick fallback), steam puffs, tap-to-honk, eraser removes trains
+
 ### Next
-- Step 3: trains
+- Step 4: yards, stations, bridges, tunnels, trees, houses
 
 ### Blocked
 - Nothing
