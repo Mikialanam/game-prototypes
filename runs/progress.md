@@ -15,7 +15,7 @@ iPad touch friendly, no text, no money/score/timers, autosave in localStorage.
 4. [x] Buildings (~25 min): yards (sheds), stations (people), bridges, tunnels, trees, houses.
 5. [x] Day/night (~30 min): cycle, trains route to nearest yard and park, lights dim,
    lullaby; morning wake-up toot. Sun/moon button.
-6. [ ] Kid polish (~30 min): tap train = honk + light wave, tap station = people hop on,
+6. [x] Kid polish (~30 min): tap train = honk + light wave, tap station = people hop on,
    undo, clear with confirm, Web Audio sounds, iPad touch tuning, Playwright smoke test.
 
 ### Done
@@ -29,12 +29,16 @@ iPad touch friendly, no text, no money/score/timers, autosave in localStorage.
 
 - Step 5: 150 s day/night cycle with dusk tint, glowing houses/stations/fireflies, trains route (BFS) to nearest yard, slide into the shed, Zzz, lullaby; dawn wake-up with toots; sun/moon button; trains nap on the track if no yard is reachable
 
+- Step 6: big clear button with heart/broom confirm screen (clear is undoable too), home-screen icon, iOS silent-switch audio, no pinch/double-tap zoom; Playwright touch smoke test passes with no console errors
+
 ### Next
-- Step 6: clear with confirm, polish, full smoke test
+- Run complete. Possible follow-ups are under Later.
 
 ### Blocked
 - Nothing
 
 ### Later
+- Portrait layout: grid could adapt to tall screens (currently letterboxed)
+- Tap a switch to flip it by hand
 - Little cars driving on roads
 - Add-to-home-screen icon / offline manifest

@@ -33,7 +33,7 @@
   .btn.on { background: #ffe066; transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,.28), 0 0 0 5px #fff; }
   .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,.28); }
   .btn.undo { background: #bfe3ff; }
-  .btn.clear { background: #ffb3b3; }
+  .btn.clear { background: #ffb3b3; width: calc(1.35 * clamp(80px, calc((100vw - 150px) / 13), 92px)); }
   .btn.sky { background: #d9ccff; }
   #picker {
     position: absolute; left: 0; right: 0; margin: 0 auto; width: max-content; bottom: 12px; transform: scale(.9);
@@ -1682,6 +1682,7 @@ function buildToolbar() {
   const gap = document.createElement('div'); gap.className = 'gap'; bar.appendChild(gap);
   makeIconButton(bar, 'sky', 'sky', () => skyTap());
   makeIconButton(bar, 'undo', 'undo', () => undo());
+  makeIconButton(bar, 'clear', 'clear', () => showConfirm());
   refreshToolbar();
 }
 function selectTool(n) { tool = n; hidePicker(); refreshToolbar(); }
@@ -1689,9 +1690,71 @@ function refreshToolbar() {
   bar.querySelectorAll('.btn').forEach(b => b.classList.toggle('on', b.dataset.name === tool));
 }
 
+// ---------- clear everything (with a grown-up style "are you sure?") ----------
+const confirmBox = document.getElementById('confirm');
+function showConfirm() {
+  hidePicker();
+  confirmBox.classList.add('show');
+  confirmBox.querySelectorAll('.btn').forEach(b => paintIcon(b, b.dataset.act));
+}
+function hideConfirm() { confirmBox.classList.remove('show'); }
+confirmBox.addEventListener('pointerdown', e => {
+  e.preventDefault(); unlockAudio();
+  const b = e.target.closest('.btn');
+  if (b && b.dataset.act === 'wipe') {
+    pushUndo(); // even clearing can be undone
+    const time = world.time, nextId = world.nextId;
+    freshWorld(false); buildDecor();
+    world.time = time; world.nextId = nextId;
+    stationState.clear();
+    baseDirty = true; save();
+    sfx('sweep');
+    for (let i = 0; i < 12; i++) sparkleAt(rnd(1, COLS - 1), rnd(1, ROWS - 1));
+  } else sfx('tick');
+  hideConfirm();
+});
+Object.assign(ICONS, {
+  clear(g, w, h) { // a broom sweeping
+    const s = Math.min(w, h);
+    g.save(); g.translate(w / 2, h / 2); g.rotate(0.6);
+    g.fillStyle = '#8b5a2b'; rrect(g, -s * 0.04, -s * 0.42, s * 0.08, s * 0.5, s * 0.04); g.fill();
+    g.fillStyle = '#fab005'; g.beginPath(); g.moveTo(-s * 0.1, s * 0.06); g.lineTo(s * 0.1, s * 0.06); g.lineTo(s * 0.2, s * 0.36); g.lineTo(-s * 0.2, s * 0.36); g.closePath(); g.fill();
+    g.strokeStyle = '#e67700'; g.lineWidth = 2;
+    for (let i = -2; i <= 2; i++) { g.beginPath(); g.moveTo(i * s * 0.035, s * 0.1); g.lineTo(i * s * 0.07, s * 0.34); g.stroke(); }
+    g.fillStyle = '#e03131'; g.fillRect(-s * 0.11, s * 0.04, s * 0.22, s * 0.05);
+    g.restore();
+    circle(g, w * 0.2, h * 0.78, s * 0.05, 'rgba(120,120,120,.5)'); circle(g, w * 0.3, h * 0.84, s * 0.035, 'rgba(120,120,120,.4)');
+  },
+  wipe(g, w, h) { ICONS.clear(g, w, h); },
+  keep(g, w, h) { // a big friendly heart: "keep my trains"
+    const s = Math.min(w, h), cx = w / 2, cy = h / 2 + s * 0.04;
+    g.fillStyle = '#e03131';
+    g.beginPath();
+    g.moveTo(cx, cy + s * 0.28);
+    g.bezierCurveTo(cx - s * 0.5, cy - s * 0.05, cx - s * 0.22, cy - s * 0.42, cx, cy - s * 0.16);
+    g.bezierCurveTo(cx + s * 0.22, cy - s * 0.42, cx + s * 0.5, cy - s * 0.05, cx, cy + s * 0.28);
+    g.fill();
+    circle(g, cx - s * 0.14, cy - s * 0.14, s * 0.05, 'rgba(255,255,255,.6)');
+  },
+});
+
+// a home-screen icon drawn on the fly (used by "Add to Home Screen")
+function makeTouchIcon() {
+  try {
+    const c = document.createElement('canvas'); c.width = c.height = 180;
+    const g = c.getContext('2d');
+    g.fillStyle = '#7fcf6a'; g.fillRect(0, 0, 180, 180);
+    drawSideTrain(g, 180, 180, 'steam');
+    const l = document.createElement('link'); l.rel = 'apple-touch-icon'; l.href = c.toDataURL('image/png');
+    document.head.appendChild(l);
+  } catch (e) { /* not important */ }
+}
+
 // ---------- audio ----------
 let AC = null;
 function unlockAudio() {
+  // newer iPads: let the sounds play even when the side switch is on silent
+  try { if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch (e) { /* older iOS */ }
   if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
   if (AC && AC.state === 'suspended') AC.resume();
   if (AC && !AC._master) {
@@ -1800,6 +1863,11 @@ resize();
 for (const t of world.trains) t.poses = carPoses(t);
 requestAnimationFrame(frame);
 window.addEventListener('pagehide', save);
+makeTouchIcon();
+// no pinch-zoom or double-tap zoom on iPad
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('dblclick', e => e.preventDefault());
+document.addEventListener('contextmenu', e => e.preventDefault());
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
 </script>
 </body>
