@@ -116,9 +116,116 @@ function freshWorld(withStarter) {
 }
 
 function buildStarter() {
+  buildDecor();
+  // a little loop with (later) a yard, a station and a steam engine so something moves straight away
+  const loop = [];
+  for (let c = 5; c <= 9; c++) loop.push([2, c]);
+  for (let r = 3; r <= 7; r++) loop.push([r, 9]);
+  for (let c = 8; c >= 5; c--) loop.push([7, c]);
+  for (let r = 6; r >= 2; r--) loop.push([r, 5]);
+  for (let i = 0; i < loop.length - 1; i++) link(loop[i][0], loop[i][1], loop[i + 1][0], loop[i + 1][1]);
+  if (typeof starterExtras === 'function') starterExtras();
+}
+
+function buildDecor() {
   // a few houses and trees for decoration
   [[11, 1], [12, 5], [8, 1], [12, 9], [2, 17], [5, 18]].forEach(([r, c], i) => { const k = cell(r, c); if (k.g === 'grass') { k.o = 'house'; k.v = i % 4; } });
   [[0, 0], [1, 1], [13, 0], [11, 7], [0, 9], [13, 13], [7, 19], [12, 19], [1, 15], [6, 15]].forEach(([r, c]) => { const k = cell(r, c); if (k.g === 'grass' && !k.o) k.o = 'tree'; });
+}
+
+// ---------- track topology ----------
+// A cell's track is a mask of the edges it links to. The pieces (lanes a train
+// can drive) are derived from it, so tracks snap together on their own:
+//   0 links: a lone straight, 1: straight to a buffer stop, 2: straight or curve,
+//   3: a switch (straight + two curves), 4: a crossing.
+function pieces(m) {
+  const n = bits(m);
+  if (n === 0) return [[W, E]];
+  if (n === 1) return [[m, OPP[m]]];
+  if (n === 2) { const [a, b] = DIRS.filter(d => m & d); return [[a, b]]; }
+  if (n === 3) {
+    const x = (m & N) && (m & S) ? N : E, y = OPP[x], c = DIRS.find(d => (m & d) && d !== x && d !== y);
+    return [[x, y], [x, c], [y, c]];
+  }
+  return [[N, S], [E, W]];
+}
+function exitsFrom(m, entry) {
+  const out = [];
+  for (const [a, b] of pieces(m)) { if (a === entry) out.push(b); else if (b === entry) out.push(a); }
+  return out;
+}
+function hasPiece(m, a, b) { return pieces(m).some(([x, y]) => (x === a && y === b) || (x === b && y === a)); }
+// can a train leave cell (r,c) through edge d into the neighbour?
+function connected(r, c, d) {
+  const k = cell(r, c), n = cell(r + DY[d], c + DX[d]);
+  return !!(k && n && k.t !== null && n.t !== null && (k.t & d) && (n.t & OPP[d]));
+}
+function canTrack(k) { return k && (k.g === 'grass' || k.g === 'road' || k.g === 'water') && k.o !== 'tree' && k.o !== 'house'; }
+function putTrack(k) { if (k.t === null) k.t = 0; if (k.g === 'water') k.b = 1; }
+
+function link(r1, c1, r2, c2) {
+  const a = cell(r1, c1), b = cell(r2, c2);
+  if (!canTrack(a) || !canTrack(b)) return false;
+  let d = 0;
+  for (const dd of DIRS) if (r1 + DY[dd] === r2 && c1 + DX[dd] === c2) d = dd;
+  if (!d) return false;
+  putTrack(a); putTrack(b);
+  if ((a.t & d) && (b.t & OPP[d])) return false;
+  a.t |= d; b.t |= OPP[d];
+  return true;
+}
+
+// tapping an empty spot lays one piece that joins up with loose ends next to it
+function tapTrack(r, c) {
+  const k = cell(r, c);
+  if (!canTrack(k)) return false;
+  if (k.t !== null && bits(k.t) >= 2) return false;
+  const was = k.t;
+  putTrack(k);
+  const cands = DIRS.map(d => ({ d, n: cell(r + DY[d], c + DX[d]) }))
+    .filter(o => o.n && o.n.t !== null && !(k.t & o.d) && bits(o.n.t) < 2)
+    .sort((p, q) => {
+      // prefer neighbours whose loose end points at us
+      const pp = p.n.t === OPP[OPP[p.d]] ? 0 : 1, qq = q.n.t === OPP[OPP[q.d]] ? 0 : 1;
+      return pp - qq;
+    });
+  for (const o of cands) { if (bits(k.t) >= 2) break; link(r, c, r + DY[o.d], c + DX[o.d]); }
+  return was === null || k.t !== was;
+}
+
+function eraseCell(r, c) {
+  const k = cell(r, c);
+  if (!k) return false;
+  if (k.o) { k.o = null; return 'obj'; }
+  if (k.t !== null) {
+    if (trainOnCell(r, c)) return 'busy';
+    for (const d of DIRS) if (k.t & d) { const n = cell(r + DY[d], c + DX[d]); if (n && n.t !== null) n.t &= ~OPP[d]; }
+    k.t = null; k.sw = 0;
+    return 'track';
+  }
+  if (k.b) { k.b = 0; return 'obj'; }
+  return false;
+}
+function trainOnCell(r, c) { return false; }
+
+// geometry of a piece inside a cell, in cell units (0..1). f is 0..1 along a->b.
+const EDGE_PT = { 1: [0.5, 0], 2: [1, 0.5], 4: [0.5, 1], 8: [0, 0.5] };
+const CORNER = { 3: [1, 0], 6: [1, 1], 12: [0, 1], 9: [0, 0] }; // N|E, E|S, S|W, W|N
+function pieceLen(a, b) { return OPP[a] === b ? 1 : Math.PI / 4; }
+function piecePoint(a, b, f) {
+  const p = EDGE_PT[a], q = EDGE_PT[b];
+  if (OPP[a] === b) return [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f];
+  const cn = CORNER[a | b];
+  const a0 = Math.atan2(p[1] - cn[1], p[0] - cn[0]);
+  let a1 = Math.atan2(q[1] - cn[1], q[0] - cn[0]);
+  let da = a1 - a0; while (da > Math.PI) da -= TAU; while (da < -Math.PI) da += TAU;
+  const ang = a0 + da * f;
+  return [cn[0] + Math.cos(ang) * 0.5, cn[1] + Math.sin(ang) * 0.5];
+}
+function pieceDir(a, b, f) {
+  const p = piecePoint(a, b, Math.max(0, f - 0.01)), q = piecePoint(a, b, Math.min(1, f + 0.01));
+  const dx = q[0] - p[0], dy = q[1] - p[1], l = Math.hypot(dx, dy) || 1;
+  return [dx / l, dy / l];
 }
 
 // ---------- layout / view ----------
@@ -212,8 +319,76 @@ function renderBase() {
 
 function drawCellContents(g, r, c, x, y, s) {
   const k = cell(r, c);
+  if (k.b) drawBridge(g, k, x, y, s);
+  if (k.t !== null) drawTrack(g, k, x, y, s);
   if (k.o === 'tree') drawTree(g, x, y, s, k.v);
   if (k.o === 'house') drawHouse(g, x, y, s, k.v, 0);
+}
+
+function tracePiece(g, a, b, x, y, s, off) {
+  const n = OPP[a] === b ? 2 : 10;
+  for (let i = 0; i <= n; i++) {
+    const f = i / n, p = piecePoint(a, b, f), d = pieceDir(a, b, f);
+    const px = x + (p[0] - d[1] * off) * s, py = y + (p[1] + d[0] * off) * s;
+    i ? g.lineTo(px, py) : g.moveTo(px, py);
+  }
+}
+
+function drawTrack(g, k, x, y, s) {
+  const ps = pieces(k.t).slice().reverse(); // curves under, straight on top
+  g.lineCap = 'butt';
+  // ballast bed
+  g.strokeStyle = k.b ? 'rgba(0,0,0,0)' : 'rgba(160,140,110,.55)'; g.lineWidth = s * 0.56;
+  for (const [a, b] of ps) { g.beginPath(); tracePiece(g, a, b, x, y, s, 0); g.stroke(); }
+  // sleepers
+  g.strokeStyle = '#9c6b3c'; g.lineWidth = s * 0.09;
+  for (const [a, b] of ps) {
+    const L = pieceLen(a, b), n = Math.round(L * 4);
+    for (let i = 0; i < n; i++) {
+      const f = (i + 0.5) / n, p = piecePoint(a, b, f), d = pieceDir(a, b, f);
+      g.beginPath();
+      g.moveTo(x + (p[0] - d[1] * 0.25) * s, y + (p[1] + d[0] * 0.25) * s);
+      g.lineTo(x + (p[0] + d[1] * 0.25) * s, y + (p[1] - d[0] * 0.25) * s);
+      g.stroke();
+    }
+  }
+  // rails
+  for (const [a, b] of ps) {
+    for (const off of [-0.15, 0.15]) {
+      g.strokeStyle = '#495057'; g.lineWidth = s * 0.075;
+      g.beginPath(); tracePiece(g, a, b, x, y, s, off); g.stroke();
+      g.strokeStyle = '#ced4da'; g.lineWidth = s * 0.025;
+      g.beginPath(); tracePiece(g, a, b, x, y, s, off); g.stroke();
+    }
+  }
+  // buffer stops at loose ends
+  const m = k.t, ends = bits(m) === 0 ? [W, E] : bits(m) === 1 ? [OPP[m]] : [];
+  const r = Math.round((y - OY) / CS), c = Math.round((x - OX) / CS);
+  for (const d of DIRS) if ((m & d) && !connected(r, c, d)) ends.push(d);
+  for (const d of ends) {
+    const p = EDGE_PT[d], inx = -DX[d] * 0.1, iny = -DY[d] * 0.1;
+    const cx = x + (p[0] + inx) * s, cy = y + (p[1] + iny) * s;
+    g.fillStyle = '#e03131';
+    if (DX[d]) rrect(g, cx - s * 0.06, cy - s * 0.24, s * 0.12, s * 0.48, s * 0.04);
+    else rrect(g, cx - s * 0.24, cy - s * 0.06, s * 0.48, s * 0.12, s * 0.04);
+    g.fill();
+    g.fillStyle = '#fff'; circle(g, cx, cy, s * 0.04, '#fff');
+  }
+}
+
+function drawBridge(g, k, x, y, s) {
+  const ps = k.t !== null ? pieces(k.t) : [[W, E]];
+  // stone piers + wooden deck along each lane
+  g.lineCap = 'butt';
+  g.strokeStyle = 'rgba(0,0,0,.2)'; g.lineWidth = s * 0.78;
+  for (const [a, b] of ps) { g.save(); g.translate(s * 0.06, s * 0.08); g.beginPath(); tracePiece(g, a, b, x, y, s, 0); g.stroke(); g.restore(); }
+  g.strokeStyle = '#a0522d'; g.lineWidth = s * 0.78;
+  for (const [a, b] of ps) { g.beginPath(); tracePiece(g, a, b, x, y, s, 0); g.stroke(); }
+  g.strokeStyle = '#d9a066'; g.lineWidth = s * 0.62;
+  for (const [a, b] of ps) { g.beginPath(); tracePiece(g, a, b, x, y, s, 0); g.stroke(); }
+  // railings
+  g.strokeStyle = '#ffffff'; g.lineWidth = s * 0.05;
+  for (const [a, b] of ps) for (const off of [-0.36, 0.36]) { g.beginPath(); tracePiece(g, a, b, x, y, s, off); g.stroke(); }
 }
 
 function drawTree(g, x, y, s, v) {
@@ -308,6 +483,121 @@ function load() {
 function serTrain(t) { return null; }
 function deTrain(o) { return null; }
 
+// ---------- undo ----------
+const undoStack = [];
+function pushUndo() {
+  undoStack.push(JSON.stringify(serialize()));
+  if (undoStack.length > 40) undoStack.shift();
+}
+function undo() {
+  if (!undoStack.length) { sfx('boop'); return; }
+  deserialize(JSON.parse(undoStack.pop()));
+  baseDirty = true; saveSoon();
+  sfx('undo');
+}
+function saveSoon() { saveTimer = Math.max(saveTimer, 3.5); }
+
+// ---------- touch input ----------
+let stroke = null;
+function cellAt(px, py) {
+  const c = Math.floor((px - OX) / CS), r = Math.floor((py - OY) / CS);
+  return inGrid(r, c) ? { r, c } : null;
+}
+function localXY(e) { const b = cv.getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top]; }
+
+function changed() { // call before the first change of a stroke
+  if (stroke && !stroke.snap) { stroke.snap = true; pushUndo(); }
+  baseDirty = true; saveSoon();
+}
+
+cv.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  unlockAudio();
+  hidePicker();
+  if (stroke) return; // one finger at a time
+  const [px, py] = localXY(e);
+  if (tool !== 'eraser' && tapTrainAt(px, py)) return;
+  const at = cellAt(px, py);
+  if (!at) return;
+  stroke = { id: e.pointerId, r: at.r, c: at.c, moved: false, snap: false, done: new Set() };
+  try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+  if (PAINT_TOOLS.has(tool)) paintAt(at.r, at.c);
+});
+
+cv.addEventListener('pointermove', e => {
+  if (!stroke || e.pointerId !== stroke.id) return;
+  e.preventDefault();
+  const [px, py] = localXY(e);
+  // clamp into the grid so a drag that slips off the edge still works
+  const c = clamp(Math.floor((px - OX) / CS), 0, COLS - 1), r = clamp(Math.floor((py - OY) / CS), 0, ROWS - 1);
+  // walk cell-by-cell (no diagonal jumps) towards the finger
+  let guard = 0;
+  while ((stroke.r !== r || stroke.c !== c) && guard++ < 60) {
+    const dr = r - stroke.r, dc = c - stroke.c;
+    let nr = stroke.r, nc = stroke.c;
+    if (Math.abs(dc) >= Math.abs(dr)) nc += Math.sign(dc); else nr += Math.sign(dr);
+    stepTo(nr, nc);
+  }
+});
+
+function endStroke(e) {
+  if (!stroke || e.pointerId !== stroke.id) return;
+  if (!stroke.moved) tapAt(stroke.r, stroke.c);
+  stroke = null;
+}
+cv.addEventListener('pointerup', endStroke);
+cv.addEventListener('pointercancel', e => { if (stroke && e.pointerId === stroke.id) stroke = null; });
+
+function stepTo(nr, nc) {
+  const pr = stroke.r, pc = stroke.c;
+  stroke.r = nr; stroke.c = nc; stroke.moved = true;
+  if (tool === 'track') {
+    const a = cell(pr, pc), b = cell(nr, nc);
+    if (canTrack(a) && canTrack(b)) {
+      if (!stroke.snap) { stroke.snap = true; pushUndo(); }
+      if (link(pr, pc, nr, nc)) { changed(); sfx('clack'); }
+    } else if (!canTrack(b)) sfx('boop');
+  } else if (PAINT_TOOLS.has(tool)) paintAt(nr, nc);
+}
+
+function tapAt(r, c) {
+  const k = cell(r, c);
+  if (tool !== 'eraser' && tapThingAt(r, c)) return;
+  if (tool === 'track') {
+    if (!canTrack(k)) { sfx('boop'); return; }
+    if (!stroke.snap) { stroke.snap = true; pushUndo(); }
+    if (tapTrack(r, c)) { changed(); sfx('clack'); }
+    else { undoStack.pop(); sfx('tick'); }
+  } else if (PLACE_TOOLS.has(tool)) placeAt(r, c);
+}
+
+// tools that act on every cell a finger passes over
+const PAINT_TOOLS = new Set(['eraser', 'tree', 'house', 'bridge']);
+// tools that act on a single tap
+const PLACE_TOOLS = new Set(['station', 'yard', 'tunnel', 'train']);
+
+function paintAt(r, c) {
+  const key = r * COLS + c;
+  if (stroke.done.has(key)) return;
+  stroke.done.add(key);
+  if (tool === 'eraser') {
+    const k = cell(r, c);
+    if (!stroke.snap && (k.o || k.t !== null || k.b)) { stroke.snap = true; pushUndo(); }
+    const res = eraseCell(r, c);
+    if (res === 'busy') sfx('boop');
+    else if (res) { changed(); sfx('erase'); puff(r, c); }
+    return;
+  }
+  placeAt(r, c);
+}
+
+// placing stations, yards, trains etc. is added below
+function placeAt(r, c) { }
+function tapThingAt(r, c) { return false; }
+function tapTrainAt(px, py) { return false; }
+function puff(r, c) { }
+function hidePicker() { }
+
 // ---------- toolbar ----------
 const bar = document.getElementById('bar');
 let tool = 'track';
@@ -350,8 +640,32 @@ const ICONS = {
   },
 };
 
+ICONS.eraser = (g, w, h) => {
+  const s = Math.min(w, h);
+  g.save(); g.translate(w / 2, h / 2); g.rotate(-0.5);
+  g.fillStyle = 'rgba(0,0,0,.15)'; rrect(g, -s * 0.3 + 3, -s * 0.15 + 4, s * 0.6, s * 0.3, s * 0.07); g.fill();
+  g.fillStyle = '#ff8fab'; rrect(g, -s * 0.3, -s * 0.15, s * 0.6, s * 0.3, s * 0.07); g.fill();
+  g.fillStyle = '#4dabf7'; rrect(g, s * 0.05, -s * 0.15, s * 0.25, s * 0.3, s * 0.07); g.fill(); g.fillRect(s * 0.05, -s * 0.15, s * 0.08, s * 0.3);
+  g.restore();
+  // sparkles
+  g.strokeStyle = '#fab005'; g.lineWidth = 3; g.lineCap = 'round';
+  [[0.2, 0.25], [0.78, 0.72]].forEach(([fx, fy]) => { const x = fx * w, y = fy * h; g.beginPath(); g.moveTo(x - 7, y); g.lineTo(x + 7, y); g.moveTo(x, y - 7); g.lineTo(x, y + 7); g.stroke(); });
+};
+ICONS.undo = (g, w, h) => {
+  const s = Math.min(w, h);
+  g.save(); g.translate(w / 2, h / 2);
+  g.strokeStyle = '#1971c2'; g.lineWidth = s * 0.11; g.lineCap = 'round';
+  g.beginPath(); g.arc(0, s * 0.04, s * 0.24, Math.PI * 1.1, Math.PI * 2.6); g.stroke();
+  g.fillStyle = '#1971c2';
+  g.beginPath(); g.moveTo(-s * 0.38, -s * 0.2); g.lineTo(-s * 0.12, -s * 0.12); g.lineTo(-s * 0.32, s * 0.08); g.closePath();
+  g.lineJoin = 'round'; g.lineWidth = s * 0.05; g.strokeStyle = '#1971c2'; g.fill(); g.stroke();
+  g.restore();
+};
+
 function buildToolbar() {
-  ['track'].forEach(n => makeIconButton(bar, n, '', b => selectTool(n)));
+  ['track', 'eraser'].forEach(n => makeIconButton(bar, n, '', b => selectTool(n)));
+  const gap = document.createElement('div'); gap.className = 'gap'; bar.appendChild(gap);
+  makeIconButton(bar, 'undo', 'undo', () => undo());
   refreshToolbar();
 }
 function selectTool(n) { tool = n; refreshToolbar(); }
@@ -364,6 +678,102 @@ let AC = null;
 function unlockAudio() {
   if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
   if (AC && AC.state === 'suspended') AC.resume();
+  if (AC && !AC._master) {
+    AC._master = AC.createGain(); AC._master.gain.value = 0.8; AC._master.connect(AC.destination);
+    // iOS: a tiny silent buffer on the first touch wakes the audio pipeline up
+    const b = AC.createBuffer(1, 1, 22050), s = AC.createBufferSource(); s.buffer = b; s.connect(AC._master); s.start(0);
+  }
+}
+
+// one soft note: frequency glide f0 -> f1, gentle attack and release
+function tone(f0, dur, opt = {}) {
+  if (!AC || !AC._master) return;
+  const t0 = AC.currentTime + (opt.at || 0), f1 = opt.to || f0, vol = opt.vol == null ? 0.25 : opt.vol;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = opt.type || 'sine';
+  o.frequency.setValueAtTime(f0, t0);
+  if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+  const atk = opt.atk || 0.01;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol, t0 + atk);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  let out = g;
+  if (opt.lp) { const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = opt.lp; g.connect(f); out = f; }
+  o.connect(g); out.connect(AC._master);
+  o.start(t0); o.stop(t0 + dur + 0.05);
+}
+let noiseBuf = null;
+function noise(dur, opt = {}) {
+  if (!AC || !AC._master) return;
+  if (!noiseBuf) { noiseBuf = AC.createBuffer(1, AC.sampleRate, AC.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+  const t0 = AC.currentTime + (opt.at || 0);
+  const s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
+  s.buffer = noiseBuf; f.type = opt.ft || 'bandpass'; f.frequency.value = opt.f || 1200; f.Q.value = opt.q || 1;
+  g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(opt.vol || 0.2, t0 + (opt.atk || 0.005));
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  s.connect(f); f.connect(g); g.connect(AC._master);
+  s.start(t0); s.stop(t0 + dur + 0.05);
+}
+// a horn chord: several detuned oscillators through a low-pass
+function horn(freqs, dur, opt = {}) {
+  for (const f of freqs) tone(f, dur, { type: opt.type || 'sawtooth', vol: (opt.vol || 0.1) / freqs.length * 2, atk: 0.04, lp: opt.lp || 1400, at: opt.at || 0 });
+}
+
+const NOTE = n => 440 * Math.pow(2, (n - 69) / 12);
+let lastBoop = 0;
+function sfx(name, arg) {
+  if (!AC) return;
+  switch (name) {
+    case 'clack': noise(0.06, { f: 2200, q: 2, vol: 0.18 }); tone(180, 0.08, { type: 'triangle', vol: 0.12 }); break;
+    case 'tick': tone(900, 0.05, { vol: 0.08 }); break;
+    case 'boop': { const t = performance.now(); if (t - lastBoop < 350) return; lastBoop = t; tone(300, 0.18, { to: 220, type: 'triangle', vol: 0.15 }); break; }
+    case 'erase': noise(0.18, { f: 900, q: 0.7, vol: 0.18 }); tone(500, 0.15, { to: 250, vol: 0.08 }); break;
+    case 'undo': tone(700, 0.22, { to: 350, type: 'triangle', vol: 0.15 }); break;
+    case 'pop': tone(400, 0.14, { to: 900, vol: 0.22 }); tone(1200, 0.08, { at: 0.08, vol: 0.08 }); break;
+    case 'plant': tone(520, 0.1, { to: 780, vol: 0.18 }); tone(780, 0.12, { at: 0.08, to: 1040, vol: 0.12 }); break;
+    case 'knock': tone(330, 0.09, { type: 'triangle', vol: 0.25 }); tone(330, 0.09, { type: 'triangle', vol: 0.25, at: 0.14 }); break;
+    case 'sweep': noise(0.8, { f: 600, q: 0.5, vol: 0.2, atk: 0.2 }); tone(900, 0.8, { to: 200, vol: 0.1, atk: 0.1 }); break;
+    case 'ding': tone(NOTE(84), 0.9, { vol: 0.18 }); tone(NOTE(79), 1.1, { vol: 0.18, at: 0.35 }); break;
+    case 'hop': [72, 76, 79, 84].forEach((n, i) => tone(NOTE(n), 0.16, { type: 'square', vol: 0.06, at: i * 0.09, lp: 2500 })); break;
+    case 'snore': tone(110, 0.9, { to: 140, type: 'triangle', vol: 0.12, atk: 0.4, lp: 600 }); break;
+    case 'chime': tone(NOTE(arg || 79), 1.4, { vol: 0.1, atk: 0.02 }); tone(NOTE((arg || 79) + 12), 1.0, { vol: 0.04 }); break;
+    case 'lullaby': {
+      // a slow original little tune, like a music box
+      const tune = [[76, 0], [79, 0.5], [84, 1], [83, 1.75], [79, 2.25], [76, 3], [77, 3.5], [76, 4], [74, 4.5], [72, 5.25]];
+      tune.forEach(([n, t]) => { tone(NOTE(n), 1.3, { vol: 0.09, at: t }); tone(NOTE(n + 12), 0.6, { vol: 0.025, at: t }); });
+      [[48, 0], [55, 1], [53, 3], [48, 4.5]].forEach(([n, t]) => tone(NOTE(n), 1.8, { type: 'triangle', vol: 0.05, at: t, atk: 0.2 }));
+      break;
+    }
+    case 'morning': {
+      [[72, 0], [76, 0.12], [79, 0.24], [84, 0.36]].forEach(([n, t]) => tone(NOTE(n), 0.5, { vol: 0.1, at: t }));
+      for (let i = 0; i < 4; i++) tone(2400 + i * 200, 0.08, { to: 3200, vol: 0.05, at: 0.8 + i * 0.15 });
+      break;
+    }
+    case 'honk': honk(arg); break;
+  }
+}
+
+function honk(type) {
+  switch (type) {
+    case 'steam': // whistle: toot-toooot
+      tone(NOTE(81), 0.3, { type: 'triangle', vol: 0.18, atk: 0.03 }); tone(NOTE(85), 0.3, { type: 'triangle', vol: 0.1, atk: 0.03 });
+      tone(NOTE(81), 0.7, { type: 'triangle', vol: 0.18, atk: 0.03, at: 0.38 }); tone(NOTE(85), 0.7, { type: 'triangle', vol: 0.1, atk: 0.03, at: 0.38 });
+      noise(1.1, { f: 3000, q: 0.8, vol: 0.05 });
+      break;
+    case 'streetcar': // ding ding bell
+      [0, 0.28].forEach(t => { tone(NOTE(88), 0.6, { vol: 0.2, at: t }); tone(NOTE(88) * 2.7, 0.3, { vol: 0.05, at: t }); });
+      break;
+    case 'subway': // two quick beeps
+      [0, 0.22].forEach(t => tone(NOTE(76), 0.16, { type: 'square', vol: 0.08, at: t, lp: 2000 }));
+      horn([NOTE(64), NOTE(67)], 0.5, { at: 0.5, vol: 0.12 });
+      break;
+    case 'freight': // low long horn
+      horn([NOTE(50), NOTE(54), NOTE(57)], 1.0, { vol: 0.16, lp: 900 });
+      break;
+    default: // commuter: friendly two-tone horn
+      horn([NOTE(69), NOTE(73)], 0.35, { vol: 0.14 });
+      horn([NOTE(66), NOTE(69)], 0.5, { vol: 0.14, at: 0.4 });
+  }
 }
 
 // ---------- boot ----------
